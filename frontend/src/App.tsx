@@ -9,11 +9,10 @@ import {
   Send, 
   CheckCircle, 
   XCircle, 
-  RefreshCw, 
   TrendingUp, 
   AlertTriangle 
 } from 'lucide-react';
-import { ExamenSession, ExamenReport } from './types';
+import type { ExamenSession, ExamenReport } from './types';
 
 export default function App() {
   const [screen, setScreen] = useState<'DASHBOARD' | 'SIMULATOR' | 'RESULTS'>('DASHBOARD');
@@ -23,7 +22,7 @@ export default function App() {
   
   // Temporizador
   const [timer, setTimer] = useState<number>(0);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<any>(null);
   
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
