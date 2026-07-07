@@ -50,4 +50,4 @@ def test_api_formulas_calculate():
         "params": {"d1": 4.0, "ke": 0.12, "g": 0.08}
     })
     assert response.status_code == 200
-    assert response.json()["precio_teorico"] == 100.0
+    assert response.json()["precio_teorico"] == pytest.approx(100.0)
