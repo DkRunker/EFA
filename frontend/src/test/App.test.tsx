@@ -2,14 +2,14 @@ import { render, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
 import App from '../App';
 
-test('renders dashboard with title and exam buttons', () => {
+test('renders auth screen by default', () => {
   render(<App />);
   
-  // Verificar cabecera
-  expect(screen.getByText('EFA Prep')).toBeInTheDocument();
+  // Verificar cabecera de autenticación
+  expect(screen.getByText('EFA Prep Platform')).toBeInTheDocument();
+  expect(screen.getByText('Accede a tu simulador inteligente oficial')).toBeInTheDocument();
   
-  // Verificar botones de examen
-  expect(screen.getByText('EIP Nivel I')).toBeInTheDocument();
-  expect(screen.getAllByText('EFA Completo')[0]).toBeInTheDocument();
-  expect(screen.getByText('EFA Nivel II')).toBeInTheDocument();
+  // Verificar campos
+  expect(screen.getByText('Usuario')).toBeInTheDocument();
+  expect(screen.getByText('Contraseña')).toBeInTheDocument();
 });
