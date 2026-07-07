@@ -55,6 +55,11 @@ export default function App() {
   });
   const [studyResult, setStudyResult] = useState<any>(null);
 
+  // Nuevas variables para apuntes de estudio
+  const [studySubTab, setStudySubTab] = useState<'SANDBOX' | 'APUNTES'>('SANDBOX');
+  const [selectedApunteModulo, setSelectedApunteModulo] = useState<string>('M1');
+  const [apuntesContent, setApuntesContent] = useState<string>('');
+
   // Historial e intentos
   const [historial, setHistorial] = useState<Array<{ usuario: string; tipo: string; nota: number; aprobado: boolean; fecha: string }>>(() => {
     const saved = localStorage.getItem('efa_historial_v2');
@@ -81,6 +86,24 @@ export default function App() {
       return () => clearTimeout(t);
     }
   }, [screen, selectedQuestionIndex, activeReport, selectedFormula, studyResult, currentUser]);
+
+  // Efecto para cargar apuntes teóricos
+  useEffect(() => {
+    if (screen === 'STUDY' && studySubTab === 'APUNTES') {
+      setErrorMsg('');
+      fetch(`http://localhost:8000/api/study/apuntes/${selectedApunteModulo}`)
+        .then(res => {
+          if (!res.ok) throw new Error('No se pudieron cargar los apuntes.');
+          return res.json();
+        })
+        .then(data => {
+          setApuntesContent(data.apuntes);
+        })
+        .catch(err => {
+          setErrorMsg(err.message || 'Error de conexión');
+        });
+    }
+  }, [screen, studySubTab, selectedApunteModulo]);
 
   // Temporizador de Examen
   useEffect(() => {
@@ -543,288 +566,367 @@ export default function App() {
 
       {/* PANTALLA: SANDBOX DE ESTUDIO */}
       {screen === 'STUDY' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
-          {/* Parámetros de la fórmula */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--secondary)', paddingLeft: '12px' }}>
-              Calculadora Sandbox de Fórmulas
-            </h3>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Selecciona la Fórmula a Estudiar
-              </label>
-              <select
-                value={selectedFormula}
-                onChange={(e) => {
-                  setSelectedFormula(e.target.value);
-                  setStudyResult(null);
-                }}
-                style={{
-                  width: '100%',
-                  background: 'rgba(0,0,0,0.3)',
-                  border: '1px solid var(--border-color)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '1rem',
-                  outline: 'none'
-                }}
-              >
-                <option value="gordon_shapiro">Gordon-Shapiro (Precio Teórico Acción)</option>
-                <option value="sharpe">Ratio de Sharpe (Rendimiento/Volatilidad)</option>
-                <option value="treynor">Ratio de Treynor (Rendimiento/Beta)</option>
-                <option value="jensen">Alfa de Jensen (Frente a CAPM)</option>
-                <option value="tae">Conversión TIN a TAE (Interés Compuesto)</option>
-                <option value="precio_bono">Precio de un Bono de Renta Fija</option>
-                <option value="irpf_ahorro">Escala de Gravamen del Ahorro IRPF (España 2026)</option>
-              </select>
-            </div>
-
-            {/* Inputs dinámicos según fórmula */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '12px' }}>
-              {selectedFormula === 'gordon_shapiro' && (
-                <>
-                  <div>
-                    <label>D1 (Dividendo esperado)</label>
-                    <input type="number" step="0.01" value={studyParams.d1} onChange={(e) => handleParamChange('d1', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>ke (Rentabilidad exigida)</label>
-                    <input type="number" step="0.001" value={studyParams.ke} onChange={(e) => handleParamChange('ke', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>g (Tasa de crecimiento)</label>
-                    <input type="number" step="0.001" value={studyParams.g} onChange={(e) => handleParamChange('g', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {selectedFormula === 'sharpe' && (
-                <>
-                  <div>
-                    <label>Rp (Rentabilidad cartera)</label>
-                    <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Rf (Tasa libre riesgo)</label>
-                    <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>σp (Desviación estándar)</label>
-                    <input type="number" step="0.001" value={studyParams.sigma_p} onChange={(e) => handleParamChange('sigma_p', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {selectedFormula === 'treynor' && (
-                <>
-                  <div>
-                    <label>Rp (Rentabilidad cartera)</label>
-                    <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Rf (Tasa libre riesgo)</label>
-                    <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>βp (Beta de la cartera)</label>
-                    <input type="number" step="0.01" value={studyParams.beta_p} onChange={(e) => handleParamChange('beta_p', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {selectedFormula === 'jensen' && (
-                <>
-                  <div>
-                    <label>Rp (Rentabilidad cartera)</label>
-                    <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Rf (Tasa libre riesgo)</label>
-                    <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>βp (Beta de la cartera)</label>
-                    <input type="number" step="0.01" value={studyParams.beta_p} onChange={(e) => handleParamChange('beta_p', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Rm (Rentabilidad mercado)</label>
-                    <input type="number" step="0.001" value={studyParams.rm} onChange={(e) => handleParamChange('rm', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {selectedFormula === 'tae' && (
-                <>
-                  <div>
-                    <label>TIN (Interés Nominal)</label>
-                    <input type="number" step="0.001" value={studyParams.tin} onChange={(e) => handleParamChange('tin', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>m (Liquidaciones al año)</label>
-                    <input type="number" step="1" value={studyParams.m} onChange={(e) => handleParamChange('m', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {selectedFormula === 'precio_bono' && (
-                <>
-                  <div>
-                    <label>Valor Nominal</label>
-                    <input type="number" value={studyParams.nominal} onChange={(e) => handleParamChange('nominal', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Cupón anual (%)</label>
-                    <input type="number" step="0.001" value={studyParams.cupon_anual_pct} onChange={(e) => handleParamChange('cupon_anual_pct', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Vencimiento (años)</label>
-                    <input type="number" value={studyParams.n_anos} onChange={(e) => handleParamChange('n_anos', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>TIR exigida</label>
-                    <input type="number" step="0.001" value={studyParams.tir} onChange={(e) => handleParamChange('tir', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {selectedFormula === 'irpf_ahorro' && (
-                <div style={{ gridColumn: 'span 2' }}>
-                  <label>Base liquidable del ahorro (€)</label>
-                  <input type="number" value={studyParams.base_liquidable} onChange={(e) => handleParamChange('base_liquidable', e.target.value)} style={{ width: '100%' }} />
-                </div>
-              )}
-            </div>
-
-            <button className="btn btn-accent" onClick={handleCalculateStudy} disabled={isSubmitting}>
-              {isSubmitting ? 'Calculando...' : 'Calcular en Sandbox'}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Sub-navegación dentro de estudio */}
+          <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+            <button 
+              className={`btn ${studySubTab === 'SANDBOX' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStudySubTab('SANDBOX')}
+              style={{ padding: '8px 16px', fontSize: '0.95rem' }}
+            >
+              <Calculator size={16} /> Calculadora Sandbox
+            </button>
+            <button 
+              className={`btn ${studySubTab === 'APUNTES' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStudySubTab('APUNTES')}
+              style={{ padding: '8px 16px', fontSize: '0.95rem' }}
+            >
+              <BookOpen size={16} /> Temarios y Apuntes Oficiales
             </button>
           </div>
 
-          {/* Visualización académica */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '380px', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px', marginBottom: '16px' }}>
-                Explicación Matemática de la Fórmula
-              </h3>
+          {studySubTab === 'SANDBOX' ? (
+            /* CALCULADORA SANDBOX */
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
+              {/* Parámetros de la fórmula */}
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--secondary)', paddingLeft: '12px' }}>
+                  Calculadora Sandbox de Fórmulas
+                </h3>
 
-              {selectedFormula === 'gordon_shapiro' && (
                 <div>
-                  <p style={{ marginBottom: '12px' }}>Fórmula de Gordon-Shapiro:</p>
-                  <div className="math-block">
-                    {"$$P_0 = \\frac{D_1}{K_e - g}$$"}
-                  </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                    Estima el valor intrínseco de una acción asumiendo crecimiento constante indefinido de los dividendos ($g$) a una tasa menor que la rentabilidad exigida ($K_e$).
-                  </p>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    Selecciona la Fórmula a Estudiar
+                  </label>
+                  <select
+                    value={selectedFormula}
+                    onChange={(e) => {
+                      setSelectedFormula(e.target.value);
+                      setStudyResult(null);
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-color)',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="gordon_shapiro">Gordon-Shapiro (Precio Teórico Acción)</option>
+                    <option value="sharpe">Ratio de Sharpe (Rendimiento/Volatilidad)</option>
+                    <option value="treynor">Ratio de Treynor (Rendimiento/Beta)</option>
+                    <option value="jensen">Alfa de Jensen (Frente a CAPM)</option>
+                    <option value="tae">Conversión TIN a TAE (Interés Compuesto)</option>
+                    <option value="precio_bono">Precio de un Bono de Renta Fija</option>
+                    <option value="irpf_ahorro">Escala de Gravamen del Ahorro IRPF (España 2026)</option>
+                  </select>
                 </div>
-              )}
 
-              {selectedFormula === 'sharpe' && (
-                <div>
-                  <p style={{ marginBottom: '12px' }}>Ratio de Sharpe:</p>
-                  <div className="math-block">
-                    {"$$Sharpe = \\frac{R_p - R_f}{\\sigma_p}$$"}
-                  </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                    Mide la rentabilidad excedente obtenida por unidad de riesgo total (volatilidad).
-                  </p>
-                </div>
-              )}
+                {/* Inputs dinámicos según fórmula */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '12px' }}>
+                  {selectedFormula === 'gordon_shapiro' && (
+                    <>
+                      <div>
+                        <label>D1 (Dividendo esperado)</label>
+                        <input type="number" step="0.01" value={studyParams.d1} onChange={(e) => handleParamChange('d1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>ke (Rentabilidad exigida)</label>
+                        <input type="number" step="0.001" value={studyParams.ke} onChange={(e) => handleParamChange('ke', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>g (Tasa de crecimiento)</label>
+                        <input type="number" step="0.001" value={studyParams.g} onChange={(e) => handleParamChange('g', e.target.value)} />
+                      </div>
+                    </>
+                  )}
 
-              {selectedFormula === 'treynor' && (
-                <div>
-                  <p style={{ marginBottom: '12px' }}>Ratio de Treynor:</p>
-                  <div className="math-block">
-                    {"$$Treynor = \\frac{R_p - R_f}{\\beta_p}$$"}
-                  </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                    Mide el exceso de rendimiento de la cartera sobre la tasa libre de riesgo por unidad de riesgo sistemático (Beta).
-                  </p>
-                </div>
-              )}
+                  {selectedFormula === 'sharpe' && (
+                    <>
+                      <div>
+                        <label>Rp (Rentabilidad cartera)</label>
+                        <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Rf (Tasa libre riesgo)</label>
+                        <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>σp (Desviación estándar)</label>
+                        <input type="number" step="0.001" value={studyParams.sigma_p} onChange={(e) => handleParamChange('sigma_p', e.target.value)} />
+                      </div>
+                    </>
+                  )}
 
-              {selectedFormula === 'jensen' && (
-                <div>
-                  <p style={{ marginBottom: '12px' }}>Alfa de Jensen:</p>
-                  <div className="math-block">
-                    {"$$\\alpha_p = R_p - [R_f + \\beta_p(R_m - R_f)]$$"}
-                  </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                    Representa el exceso de retorno de una cartera frente a su retorno teórico CAPM. Un alfa positivo indica gestión activa exitosa.
-                  </p>
-                </div>
-              )}
+                  {selectedFormula === 'treynor' && (
+                    <>
+                      <div>
+                        <label>Rp (Rentabilidad cartera)</label>
+                        <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Rf (Tasa libre riesgo)</label>
+                        <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>βp (Beta de la cartera)</label>
+                        <input type="number" step="0.01" value={studyParams.beta_p} onChange={(e) => handleParamChange('beta_p', e.target.value)} />
+                      </div>
+                    </>
+                  )}
 
-              {selectedFormula === 'tae' && (
-                <div>
-                  <p style={{ marginBottom: '12px' }}>Tasa Anual Equivalente:</p>
-                  <div className="math-block">
-                    {"$$TAE = \\left(1 + \\frac{TIN}{m}\\right)^m - 1$$"}
-                  </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                    Equivalencia de capitalización compuesta con liquidaciones periódicas de frecuencia $m$.
-                  </p>
-                </div>
-              )}
+                  {selectedFormula === 'jensen' && (
+                    <>
+                      <div>
+                        <label>Rp (Rentabilidad cartera)</label>
+                        <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Rf (Tasa libre riesgo)</label>
+                        <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>βp (Beta de la cartera)</label>
+                        <input type="number" step="0.01" value={studyParams.beta_p} onChange={(e) => handleParamChange('beta_p', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Rm (Rentabilidad mercado)</label>
+                        <input type="number" step="0.001" value={studyParams.rm} onChange={(e) => handleParamChange('rm', e.target.value)} />
+                      </div>
+                    </>
+                  )}
 
-              {selectedFormula === 'precio_bono' && (
-                <div>
-                  <p style={{ marginBottom: '12px' }}>Precio de un Bono de Renta Fija:</p>
-                  <div className="math-block">
-                    {"$$P = \\sum_{t=1}^{n} \\frac{C_t}{(1+y)^t} + \\frac{N}{(1+y)^n}$$"}
-                  </div>
-                </div>
-              )}
+                  {selectedFormula === 'tae' && (
+                    <>
+                      <div>
+                        <label>TIN (Interés Nominal)</label>
+                        <input type="number" step="0.001" value={studyParams.tin} onChange={(e) => handleParamChange('tin', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>m (Liquidaciones al año)</label>
+                        <input type="number" step="1" value={studyParams.m} onChange={(e) => handleParamChange('m', e.target.value)} />
+                      </div>
+                    </>
+                  )}
 
-              {selectedFormula === 'irpf_ahorro' && (
-                <div>
-                  <p style={{ marginBottom: '12px' }}>Escala del IRPF del ahorro (2026):</p>
-                  <p style={{ fontSize: '0.9rem' }}>Hasta 6.000 €: <strong>19%</strong></p>
-                  <p style={{ fontSize: '0.9rem' }}>De 6.000 a 50.000 €: <strong>21%</strong></p>
-                  <p style={{ fontSize: '0.9rem' }}>De 50.000 a 200.000 €: <strong>23%</strong></p>
-                  <p style={{ fontSize: '0.9rem' }}>De 200.000 a 300.000 €: <strong>27%</strong></p>
-                  <p style={{ fontSize: '0.9rem' }}>Más de 300.000 €: <strong>28%</strong></p>
-                </div>
-              )}
-            </div>
+                  {selectedFormula === 'precio_bono' && (
+                    <>
+                      <div>
+                        <label>Valor Nominal</label>
+                        <input type="number" value={studyParams.nominal} onChange={(e) => handleParamChange('nominal', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Cupón anual (%)</label>
+                        <input type="number" step="0.001" value={studyParams.cupon_anual_pct} onChange={(e) => handleParamChange('cupon_anual_pct', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Vencimiento (años)</label>
+                        <input type="number" value={studyParams.n_anos} onChange={(e) => handleParamChange('n_anos', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>TIR exigida</label>
+                        <input type="number" step="0.001" value={studyParams.tir} onChange={(e) => handleParamChange('tir', e.target.value)} />
+                      </div>
+                    </>
+                  )}
 
-            {studyResult && (
-              <div style={{ background: 'rgba(0,229,255,0.06)', padding: '16px', borderRadius: '12px', border: '1px solid var(--secondary)' }}>
-                <h4 style={{ color: 'var(--secondary)', marginBottom: '8px', fontSize: '0.95rem' }}>Resultado del Sandbox</h4>
-                {selectedFormula === 'gordon_shapiro' && (
-                  <div>
-                    <p style={{ color: '#fff' }}>Denominador neto (ke - g): <strong>{studyResult.denominador * 100}%</strong></p>
-                    <p style={{ color: '#fff', fontSize: '1.2rem', marginTop: '6px' }}>Precio teórico: <strong>{Math.round(studyResult.precio_teorico * 100) / 100} €</strong></p>
-                  </div>
-                )}
-                
-                {selectedFormula === 'irpf_ahorro' && (
-                  <div>
-                    <p style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '8px' }}>Cuota Total: <strong>{studyResult.cuota_total.toFixed(2)} €</strong></p>
-                    <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      {studyResult.desglose.map((t: any, idx: number) => (
-                        <div key={idx}>{t.tramo}: {t.cuota_tramo.toFixed(2)} € (Base: {t.base_tramo} €)</div>
-                      ))}
+                  {selectedFormula === 'irpf_ahorro' && (
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label>Base liquidable del ahorro (€)</label>
+                      <input type="number" value={studyParams.base_liquidable} onChange={(e) => handleParamChange('base_liquidable', e.target.value)} style={{ width: '100%' }} />
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {['sharpe', 'treynor', 'jensen', 'tae', 'precio_bono'].includes(selectedFormula) && (
-                  <div>
-                    <p style={{ color: '#fff', fontSize: '1.3rem' }}>
-                      Valor: <strong>{typeof studyResult.result === 'number' ? (Math.round(studyResult.result * 100000) / 100000).toLocaleString() : JSON.stringify(studyResult)}</strong>
-                    </p>
-                  </div>
-                )}
+                <button className="btn btn-accent" onClick={handleCalculateStudy} disabled={isSubmitting}>
+                  {isSubmitting ? 'Calculando...' : 'Calcular en Sandbox'}
+                </button>
               </div>
-            )}
 
-            <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setScreen('DASHBOARD')}>
-              Volver al Dashboard
-            </button>
-          </div>
+              {/* Visualización académica */}
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '380px', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px', marginBottom: '16px' }}>
+                    Explicación Matemática de la Fórmula
+                  </h3>
+
+                  {selectedFormula === 'gordon_shapiro' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Fórmula de Gordon-Shapiro:</p>
+                      <div className="math-block">
+                        {"$$P_0 = \\frac{D_1}{K_e - g}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Estima el valor intrínseco de una acción asumiendo crecimiento constante indefinido de los dividendos ($g$) a una tasa menor que la rentabilidad exigida ($K_e$).
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'sharpe' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Ratio de Sharpe:</p>
+                      <div className="math-block">
+                        {"$$Sharpe = \\frac{R_p - R_f}{\\sigma_p}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Mide la rentabilidad excedente obtenida por unidad de riesgo total (volatilidad).
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'treynor' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Ratio de Treynor:</p>
+                      <div className="math-block">
+                        {"$$Treynor = \\frac{R_p - R_f}{\\beta_p}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Mide el exceso de rendimiento de la cartera sobre la tasa libre de riesgo por unidad de riesgo sistemático (Beta).
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'jensen' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Alfa de Jensen:</p>
+                      <div className="math-block">
+                        {"$$\\alpha_p = R_p - [R_f + \\beta_p(R_m - R_f)]$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Representa el exceso de retorno de una cartera frente a su retorno teórico CAPM. Un alfa positivo indica gestión activa exitosa.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'tae' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Tasa Anual Equivalente:</p>
+                      <div className="math-block">
+                        {"$$TAE = \\left(1 + \\frac{TIN}{m}\\right)^m - 1$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Equivalencia de capitalización compuesta con liquidaciones periódicas de frecuencia $m$.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'precio_bono' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Precio de un Bono de Renta Fija:</p>
+                      <div className="math-block">
+                        {"$$P = \\sum_{t=1}^{n} \\frac{C_t}{(1+y)^t} + \\frac{N}{(1+y)^n}$$"}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'irpf_ahorro' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Escala del IRPF del ahorro (2026):</p>
+                      <p style={{ fontSize: '0.9rem' }}>Hasta 6.000 €: <strong>19%</strong></p>
+                      <p style={{ fontSize: '0.9rem' }}>De 6.000 a 50.000 €: <strong>21%</strong></p>
+                      <p style={{ fontSize: '0.9rem' }}>De 50.000 a 200.000 €: <strong>23%</strong></p>
+                      <p style={{ fontSize: '0.9rem' }}>De 200.000 a 300.000 €: <strong>27%</strong></p>
+                      <p style={{ fontSize: '0.9rem' }}>Más de 300.000 €: <strong>28%</strong></p>
+                    </div>
+                  )}
+                </div>
+
+                {studyResult && (
+                  <div style={{ background: 'rgba(0,229,255,0.06)', padding: '16px', borderRadius: '12px', border: '1px solid var(--secondary)' }}>
+                    <h4 style={{ color: 'var(--secondary)', marginBottom: '8px', fontSize: '0.95rem' }}>Resultado del Sandbox</h4>
+                    {selectedFormula === 'gordon_shapiro' && (
+                      <div>
+                        <p style={{ color: '#fff' }}>Denominador neto (ke - g): <strong>{studyResult.denominador * 100}%</strong></p>
+                        <p style={{ color: '#fff', fontSize: '1.2rem', marginTop: '6px' }}>Precio teórico: <strong>{Math.round(studyResult.precio_teorico * 100) / 100} €</strong></p>
+                      </div>
+                    )}
+                    
+                    {selectedFormula === 'irpf_ahorro' && (
+                      <div>
+                        <p style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '8px' }}>Cuota Total: <strong>{studyResult.cuota_total.toFixed(2)} €</strong></p>
+                        <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                          {studyResult.desglose.map((t: any, idx: number) => (
+                            <div key={idx}>{t.tramo}: {t.cuota_tramo.toFixed(2)} € (Base: {t.base_tramo} €)</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {['sharpe', 'treynor', 'jensen', 'tae', 'precio_bono'].includes(selectedFormula) && (
+                      <div>
+                        <p style={{ color: '#fff', fontSize: '1.3rem' }}>
+                          Valor: <strong>{typeof studyResult.result === 'number' ? (Math.round(studyResult.result * 100000) / 100000).toLocaleString() : JSON.stringify(studyResult)}</strong>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setScreen('DASHBOARD')}>
+                  Volver al Dashboard
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* APUNTES TEÓRICOS */
+            <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
+              {/* Selector de módulo */}
+              <aside className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ marginBottom: '12px', fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>Módulos del Temario</h4>
+                {Array.from({ length: 10 }).map((_, idx) => {
+                  const mId = `M${idx + 1}`;
+                  const activo = selectedApunteModulo === mId;
+                  return (
+                    <button
+                      key={mId}
+                      onClick={() => setSelectedApunteModulo(mId)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: activo ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
+                        background: activo ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255,255,255,0.02)',
+                        color: activo ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: '0.95rem',
+                        fontWeight: activo ? 600 : 400,
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>Tema {idx + 1} ({mId})</span>
+                      <span style={{ fontSize: '0.8rem', opacity: activo ? 1 : 0.4 }}>→</span>
+                    </button>
+                  );
+                })}
+              </aside>
+
+              {/* Visualizador de apuntes */}
+              <main className="card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
+                  <div dangerouslySetInnerHTML={{ __html: apuntesContent 
+                    .replace(/### (.*)/g, '<h3 style="font-size: 1.5rem; color: #fff; margin-bottom: 16px; border-left: 4px solid var(--primary); padding-left: 12px;">$1</h3>')
+                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                    .replace(/- (.*)/g, '<li style="margin-left: 20px; margin-bottom: 8px;">$1</li>')
+                    .replace(/\n\n/g, '<br/>')
+                    .replace(/\n/g, '<br/>') 
+                  }} />
+                </div>
+                
+                <button className="btn btn-secondary" style={{ width: 'fit-content', marginTop: '32px' }} onClick={() => setScreen('DASHBOARD')}>
+                  Volver al Dashboard
+                </button>
+              </main>
+            </div>
+          )}
+
         </div>
       )}
 

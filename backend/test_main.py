@@ -74,3 +74,23 @@ def test_api_auth_register_and_login():
     login_err = client.post("/api/auth/login", json={"username": "simulado", "password": "password_error"})
     assert login_err.status_code == 401
     assert "incorrectos" in login_err.json()["detail"]
+
+def test_api_study_apuntes():
+    # 1. Obtener todos los apuntes
+    response = client.get("/api/study/apuntes")
+    assert response.status_code == 200
+    data = response.json()
+    assert "M1" in data
+    assert "M3" in data
+    assert "M10" in data
+    
+    # 2. Obtener un apunte específico
+    resp_m3 = client.get("/api/study/apuntes/M3")
+    assert resp_m3.status_code == 200
+    assert "Frontera Eficiente" in resp_m3.json()["apuntes"]
+    assert resp_m3.json()["modulo"] == "M3"
+
+    # 3. Módulo inválido
+    resp_inv = client.get("/api/study/apuntes/M11")
+    assert resp_inv.status_code == 404
+

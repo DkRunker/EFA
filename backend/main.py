@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any
 
-from backend.database import generar_examen, PREGUNTAS_TEST, PREGUNTAS_PRACTICAS
+from backend.database import generar_examen, PREGUNTAS_TEST, PREGUNTAS_PRACTICAS, APUNTES_TEORICOS
 from backend.evaluator import evaluar_respuesta_desarrollo
 from backend.formulas import (
     calcular_gordon_shapiro,
@@ -212,3 +212,17 @@ def api_calculate_formula(req: CalculateFormulaRequest):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fórmula no soportada")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.get("/api/study/apuntes")
+def api_get_todos_apuntes():
+    return APUNTES_TEORICOS
+
+@app.get("/api/study/apuntes/{modulo_id}")
+def api_get_apunte_modulo(modulo_id: str):
+    if modulo_id not in APUNTES_TEORICOS:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Apuntes para el módulo {modulo_id} no encontrados."
+        )
+    return {"modulo": modulo_id, "apuntes": APUNTES_TEORICOS[modulo_id]}

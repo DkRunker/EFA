@@ -306,3 +306,102 @@ def generar_examen(tipo_examen: str) -> dict:
         "id_practica_original": practica_seleccionada.id if practica_seleccionada else None
     }
     return res
+
+
+APUNTES_TEORICOS = {
+    "M1": (
+        "### M1: Instrumentos y Mercados Financieros\n\n"
+        "1. **Renta Fija y Curva de Tipos**:\n"
+        "   - El precio de un bono y su TIR tienen una relación inversa:\n"
+        "     $$P = \\sum_{t=1}^{n} \\frac{C}{(1+y)^t} + \\frac{N}{(1+y)^n}$$\n"
+        "   - **Duración de Macaulay**: Representa el promedio ponderado del tiempo hasta el cobro de flujos. Mide la sensibilidad del bono ante variaciones en los tipos.\n"
+        "2. **Políticas Monetarias**: Las decisiones de los bancos centrales sobre tipos de interés (por ejemplo, el BCE) impactan directamente en la valoración de renta fija y variable.\n"
+        "3. **Criterios ESG**: Integración de factores Ambientales (E), Sociales (S) y de Gobernanza (G) en el análisis y toma de decisiones de inversión."
+    ),
+    "M2": (
+        "### M2: Fondos y Sociedades de Inversión\n\n"
+        "1. **Tipos de Fondos**:\n"
+        "   - **Fondos Armonizados (UCITS)**: Cumplen directivas comunitarias, lo que les permite pasaporte europeo y comercialización minorista con estrictos límites de diversificación.\n"
+        "   - **Fondos de Inversión Libre (Hedge Funds)**: No armonizados, con amplia libertad de apalancamiento, uso de derivados y posiciones cortas.\n"
+        "2. **Gestión Activa vs Pasiva**:\n"
+        "   - La gestión activa busca batir a un índice (generar alfa) seleccionando valores individuales.\n"
+        "   - La gestión pasiva replica un índice de referencia con menores costes de gestión (por ejemplo, a través de fondos indexados o ETFs)."
+    ),
+    "M3": (
+        "### M3: Gestión de Carteras\n\n"
+        "1. **Teoría Moderna de Markowitz**:\n"
+        "   - **Frontera Eficiente**: Conjunto de carteras óptimas que maximizan el rendimiento esperado para cada nivel de volatilidad.\n"
+        "   - La diversificación reduce el **riesgo específico o diversificable** pero no elimina el **riesgo sistemático o de mercado**.\n"
+        "2. **Modelo CAPM**:\n"
+        "   - Establece la rentabilidad esperada en función del riesgo sistemático (Beta):\n"
+        "     $$E(R_i) = R_f + \\beta_i(E(R_m) - R_f)$$\n"
+        "3. **Ratios de Evaluación**:\n"
+        "   - **Ratio de Sharpe**: Evalúa rentabilidad por unidad de riesgo total:\n"
+        "     $$Sharpe = \\frac{R_p - R_f}{\\sigma_p}$$\n"
+        "   - **Ratio de Treynor**: Evalúa rentabilidad por unidad de riesgo sistemático:\n"
+        "     $$Treynor = \\frac{R_p - R_f}{\\beta_p}$$\n"
+        "   - **Alfa de Jensen**: Medida de exceso de rentabilidad ajustada por riesgo:\n"
+        "     $$\\alpha_p = R_p - [R_f + \\beta_p(R_m - R_f)]$$"
+    ),
+    "M4": (
+        "### M4: Seguros\n\n"
+        "1. **Elementos del Seguro**: Tomador (paga la prima), Asegurado (persona expuesta al riesgo) y Beneficiario (recibe la indemnización).\n"
+        "2. **Seguros Unit-Linked**: Seguros de vida donde el tomador asume el riesgo de la inversión, ya que las primas se destinan a cestas de fondos elegidas por él.\n"
+        "3. **Fiscalidad**: Las prestaciones de seguros de vida tributan generalmente como rendimientos de capital mobiliario en el IRPF (si tomador = beneficiario) o en el Impuesto de Sucesiones y Donaciones (si tomador != beneficiario)."
+    ),
+    "M5": (
+        "### M5: Pensiones y Jubilación\n\n"
+        "1. **Planes de Pensiones**: IIC de carácter previsional y aportaciones ilíquidas hasta la jubilación o supuestos excepcionales (desempleo de larga duración, enfermedad grave o antigüedad > 10 años).\n"
+        "2. **Reducción en IRPF**: Las aportaciones reducen directamente la base imponible general, con un límite máximo anual conjunto de 1.500 € en planes individuales en España.\n"
+        "3. **Rescate**: Las prestaciones recibidas del plan de pensiones (sea en forma de capital, renta o mixto) tributan íntegramente como **rendimientos del trabajo** en la base general del IRPF."
+    ),
+    "M6": (
+        "### M6: Inversión Inmobiliaria\n\n"
+        "1. **Activos Inmobiliarios**: Inversión directa (compra de inmuebles) o indirecta (IIC inmobiliarias, SOCIMIs).\n"
+        "2. **SOCIMIs (Sociedades Anónimas Cotizadas de Inversión en el Mercado Inmobiliario)**:\n"
+        "   - Gozan de un tipo de gravamen del 0% en el Impuesto sobre Sociedades.\n"
+        "   - Tienen la obligatoriedad legal de distribuir como dividendos al menos el 80% de los beneficios obtenidos del arrendamiento inmobiliario."
+    ),
+    "M7": (
+        "### M7: Crédito y Financiación\n\n"
+        "1. **TIN vs TAE**:\n"
+        "   - **TIN (Tipo de Interés Nominal)**: Tipo de interés simple contratado que no tiene en cuenta comisiones ni la frecuencia de liquidación.\n"
+        "   - **TAE (Tasa Anual Equivalente)**: Tipo de interés efectivo anual compuesto que incluye gastos, comisiones de apertura y frecuencia de liquidación periódica:\n"
+        "     $$TAE = \\left(1 + \\frac{TIN}{m}\\right)^m - 1$$\n"
+        "2. **Préstamos Hipotecarios**: Sistemas de amortización (método francés de cuota constante con mayor pago de intereses al principio)."
+    ),
+    "M8": (
+        "### M8: Fiscalidad de las Inversiones\n\n"
+        "1. **Base del Ahorro en el IRPF**: Integrada por rendimientos del capital mobiliario (dividendos, cupones) y ganancias y pérdidas patrimoniales (ventas de acciones, fondos).\n"
+        "2. **Escala del Ahorro España 2026**:\n"
+        "   - Hasta 6.000 €: 19%\n"
+        "   - De 6.000 € a 50.000 €: 21%\n"
+        "   - De 50.000 € a 200.000 €: 23%\n"
+        "   - De 200.000 € a 300.000 €: 27%\n"
+        "   - Más de 300.000 €: 28%\n"
+        "3. **Exención por Reinversión**: Traspasos exentos de tributación en fondos de inversión para personas físicas residentes en España."
+    ),
+    "M9": (
+        "### M9: Legislación, Normativa y Ética\n\n"
+        "1. **Directiva MiFID II**:\n"
+        "   - Clasifica a los clientes en Minoristas (mayor protección) y Profesionales (mayor conocimiento).\n"
+        "   - **Test de Idoneidad**: Obligatorio en asesoramiento financiero o gestión de carteras (evalúa conocimientos, objetivos y situación financiera).\n"
+        "   - **Test de Conveniencia**: Obligatorio en la mera ejecución (sólo evalúa conocimientos y experiencia).\n"
+        "2. **Código Ético EFPA**: Obligación de primar el interés del cliente, actuar con integridad, profesionalidad, objetividad y confidencialidad."
+    ),
+    "M10": (
+        "### M10: Asesoramiento y Planificación\n\n"
+        "1. **Etapas de la Planificación Financiera**:\n"
+        "   1. Establecer la relación comercial.\n"
+        "   2. Recopilar datos y fijar objetivos.\n"
+        "   3. Analizar estados financieros personales (balance familiar).\n"
+        "   4. Desarrollar y presentar recomendaciones.\n"
+        "   5. Implementar el plan.\n"
+        "   6. Monitoreo y revisión periódica.\n"
+        "2. **Planificación de Jubilación y Ciclo de Vida**: Adaptar el perfil de riesgo (más agresivo en juventud, conservador al acercarse al retiro)."
+    )
+}
+
+def obtener_todos_apuntes() -> dict[str, str]:
+    return APUNTES_TEORICOS
+
