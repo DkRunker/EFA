@@ -85,7 +85,7 @@ export default function App() {
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, studyResult, currentUser]);
+  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, studyResult, currentUser, studySubTab, selectedApunteModulo, apuntesContent]);
 
   // Efecto para cargar apuntes teóricos
   useEffect(() => {
