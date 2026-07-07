@@ -52,3 +52,25 @@ def test_api_formulas_calculate():
     })
     assert response.status_code == 200
     assert response.json()["precio_teorico"] == pytest.approx(100.0)
+
+def test_api_auth_register_and_login():
+    # 1. Registrar un usuario nuevo
+    reg_response = client.post("/api/auth/register", json={"username": "simulado", "password": "password123"})
+    assert reg_response.status_code == 200
+    assert reg_response.json()["message"] == "Usuario registrado con éxito."
+
+    # 2. Registrar el mismo usuario otra vez (debe dar error 400)
+    reg_dup = client.post("/api/auth/register", json={"username": "simulado", "password": "password123"})
+    assert reg_dup.status_code == 400
+    assert "ya existe" in reg_dup.json()["detail"]
+
+    # 3. Hacer login correcto
+    login_response = client.post("/api/auth/login", json={"username": "simulado", "password": "password123"})
+    assert login_response.status_code == 200
+    assert login_response.json()["username"] == "simulado"
+    assert "token" in login_response.json()
+
+    # 4. Hacer login incorrecto (contraseña errónea)
+    login_err = client.post("/api/auth/login", json={"username": "simulado", "password": "password_error"})
+    assert login_err.status_code == 401
+    assert "incorrectos" in login_err.json()["detail"]

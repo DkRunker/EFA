@@ -10,12 +10,27 @@ import {
   CheckCircle, 
   XCircle, 
   TrendingUp, 
-  AlertTriangle 
+  AlertTriangle,
+  User,
+  Lock,
+  BookOpen as BookIcon,
+  Calculator,
+  LogOut
 } from 'lucide-react';
 import type { ExamenSession, ExamenReport } from './types';
 
 export default function App() {
-  const [screen, setScreen] = useState<'DASHBOARD' | 'SIMULATOR' | 'RESULTS'>('DASHBOARD');
+  // Autenticación
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [authUsername, setAuthUsername] = useState<string>('');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authSuccessMsg, setAuthSuccessMsg] = useState<string>('');
+
+  // Navegación principal
+  const [screen, setScreen] = useState<'DASHBOARD' | 'SIMULATOR' | 'RESULTS' | 'STUDY'>('DASHBOARD');
+  
+  // Examen activo
   const [activeExam, setActiveExam] = useState<ExamenSession | null>(null);
   const [answersTest, setAnswersTest] = useState<Record<number, number>>({});
   const [answersPrac, setAnswersPrac] = useState<Record<number, string>>({});
@@ -28,20 +43,30 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [activeReport, setActiveReport] = useState<ExamenReport | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
-  
-  // Historial e intentos almacenados localmente
-  const [historial, setHistorial] = useState<Array<{ tipo: string; nota: number; aprobado: boolean; fecha: string }>>(() => {
-    const saved = localStorage.getItem('efa_historial');
+
+  // Sandbox de Estudio
+  const [selectedFormula, setSelectedFormula] = useState<string>('gordon_shapiro');
+  const [studyParams, setStudyParams] = useState<Record<string, number>>({
+    d1: 4.0, ke: 0.12, g: 0.08,
+    rp: 0.15, rf: 0.03, sigma_p: 0.08, beta_p: 1.2, rm: 0.10,
+    tin: 0.06, m: 12,
+    nominal: 1000.0, cupon_anual_pct: 0.05, n_anos: 3, tir: 0.04,
+    base_liquidable: 70000.0
+  });
+  const [studyResult, setStudyResult] = useState<any>(null);
+
+  // Historial e intentos
+  const [historial, setHistorial] = useState<Array<{ usuario: string; tipo: string; nota: number; aprobado: boolean; fecha: string }>>(() => {
+    const saved = localStorage.getItem('efa_historial_v2');
     return saved ? JSON.parse(saved) : [
-      { tipo: "EIP", nota: 78.5, aprobado: true, fecha: "2026-07-01" },
-      { tipo: "EFA Completo", nota: 68.0, aprobado: false, fecha: "2026-07-04" }
+      { usuario: "simulado", tipo: "EIP", nota: 78.5, aprobado: true, fecha: "2026-07-01" },
+      { usuario: "simulado", tipo: "EFA Completo", nota: 68.0, aprobado: false, fecha: "2026-07-04" }
     ];
   });
 
-  // Efecto para renderizar KaTeX dinámicamente cada vez que cambia el estado relevante
+  // Efecto KaTeX
   useEffect(() => {
     if (typeof (window as any).renderMathInElement === 'function') {
-      // Damos un breve timeout para asegurar que el DOM se haya renderizado
       const t = setTimeout(() => {
         (window as any).renderMathInElement(document.body, {
           delimiters: [
@@ -55,16 +80,16 @@ export default function App() {
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [screen, selectedQuestionIndex, activeReport]);
+  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, studyResult, currentUser]);
 
-  // Manejo del temporizador
+  // Temporizador de Examen
   useEffect(() => {
     if (screen === 'SIMULATOR' && timer > 0) {
       timerIntervalRef.current = setInterval(() => {
         setTimer((prev) => {
           if (prev <= 1) {
             clearInterval(timerIntervalRef.current!);
-            handleFinalizarExamen(true); // Auto-entrega
+            handleFinalizarExamen(true);
             return 0;
           }
           return prev - 1;
@@ -76,7 +101,53 @@ export default function App() {
     };
   }, [screen, timer]);
 
-  // Función para comenzar un examen
+  // Auth Handler
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setAuthSuccessMsg('');
+    setIsSubmitting(true);
+    
+    const endpoint = authMode === 'REGISTER' ? 'register' : 'login';
+    try {
+      const response = await fetch(`http://localhost:8000/api/auth/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: authUsername, password: authPassword })
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Error en la autenticación.');
+      }
+      
+      const data = await response.json();
+      
+      if (authMode === 'REGISTER') {
+        setAuthSuccessMsg('¡Usuario registrado con éxito! Ahora puedes iniciar sesión.');
+        setAuthMode('LOGIN');
+        setAuthPassword('');
+      } else {
+        setCurrentUser(data.username);
+        setScreen('DASHBOARD');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error de conexión');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Logout
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setScreen('DASHBOARD');
+    setAuthUsername('');
+    setAuthPassword('');
+    setAuthSuccessMsg('');
+  };
+
+  // Comienza examen
   const handleStartExam = async (tipo: string) => {
     setErrorMsg('');
     setIsSubmitting(true);
@@ -88,7 +159,7 @@ export default function App() {
       });
       
       if (!response.ok) {
-        throw new Error('No se pudo iniciar el examen. Asegúrate de que el backend de FastAPI esté corriendo en el puerto 8000.');
+        throw new Error('No se pudo iniciar el examen. Verifica el backend.');
       }
       
       const data: ExamenSession = await response.json();
@@ -96,7 +167,7 @@ export default function App() {
       setAnswersTest({});
       setAnswersPrac({});
       setSelectedQuestionIndex(0);
-      setTimer(1.5 * 60 * 60); // 1 hora y 30 minutos (5400 segundos)
+      setTimer(1.5 * 60 * 60);
       setScreen('SIMULATOR');
     } catch (err: any) {
       setErrorMsg(err.message || 'Error de conexión');
@@ -105,10 +176,10 @@ export default function App() {
     }
   };
 
-  // Función para entregar el examen
+  // Finaliza examen
   const handleFinalizarExamen = async (autoSubmit = false) => {
     if (!activeExam) return;
-    if (!autoSubmit && !window.confirm('¿Estás seguro de que deseas finalizar y calificar el examen?')) return;
+    if (!autoSubmit && !window.confirm('¿Deseas finalizar y calificar el examen?')) return;
     
     setIsSubmitting(true);
     setErrorMsg('');
@@ -125,18 +196,18 @@ export default function App() {
       });
       
       if (!response.ok) {
-        throw new Error('Error al enviar las respuestas al servidor.');
+        throw new Error('Error al enviar las respuestas.');
       }
       
       const report: ExamenReport = await response.json();
       setActiveReport(report);
       
-      // Guardar en el historial local
       const nota_final = report.nota_practica_pct !== null 
         ? (report.nota_test_pct + report.nota_practica_pct) / 2 
         : report.nota_test_pct;
         
       const nuevoIntento = {
+        usuario: currentUser || 'Anónimo',
         tipo: report.tipo_examen,
         nota: Math.round(nota_final * 10) / 10,
         aprobado: report.aprobado_general,
@@ -145,7 +216,7 @@ export default function App() {
       
       const nuevoHistorial = [nuevoIntento, ...historial];
       setHistorial(nuevoHistorial);
-      localStorage.setItem('efa_historial', JSON.stringify(nuevoHistorial));
+      localStorage.setItem('efa_historial_v2', JSON.stringify(nuevoHistorial));
       
       setScreen('RESULTS');
     } catch (err: any) {
@@ -155,43 +226,171 @@ export default function App() {
     }
   };
 
-  // Formato del cronómetro (MM:SS)
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+  // Calcular fórmula de estudio (Sandbox)
+  const handleCalculateStudy = async () => {
+    setErrorMsg('');
+    setStudyResult(null);
+    setIsSubmitting(true);
     
-    const displayMins = mins < 10 ? `0${mins}` : mins;
-    const displaySecs = secs < 10 ? `0${secs}` : secs;
-    
-    if (hrs > 0) {
-      return `${hrs}:${displayMins}:${displaySecs}`;
+    let params: Record<string, any> = {};
+    if (selectedFormula === 'gordon_shapiro') {
+      params = { d1: studyParams.d1, ke: studyParams.ke, g: studyParams.g };
+    } else if (selectedFormula === 'sharpe') {
+      params = { rp: studyParams.rp, rf: studyParams.rf, sigma_p: studyParams.sigma_p };
+    } else if (selectedFormula === 'treynor') {
+      params = { rp: studyParams.rp, rf: studyParams.rf, beta_p: studyParams.beta_p };
+    } else if (selectedFormula === 'jensen') {
+      params = { rp: studyParams.rp, rf: studyParams.rf, beta_p: studyParams.beta_p, rm: studyParams.rm };
+    } else if (selectedFormula === 'tae') {
+      params = { tin: studyParams.tin, m: studyParams.m };
+    } else if (selectedFormula === 'precio_bono') {
+      params = { nominal: studyParams.nominal, cupon_anual_pct: studyParams.cupon_anual_pct, n_anos: Math.round(studyParams.n_anos), tir: studyParams.tir };
+    } else if (selectedFormula === 'irpf_ahorro') {
+      params = { base_liquidable: studyParams.base_liquidable };
     }
-    return `${displayMins}:${displaySecs}`;
+
+    try {
+      const response = await fetch('http://localhost:8000/api/formulas/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formula: selectedFormula, params })
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Error al calcular la fórmula.');
+      }
+      
+      const res = await response.json();
+      setStudyResult(res);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error en los parámetros ingresados.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Porcentaje de aciertos históricos en Dashboard
-  const calculateGlobalAverage = () => {
-    if (historial.length === 0) return 0;
-    const total = historial.reduce((acc, curr) => acc + curr.nota, 0);
-    return Math.round(total / historial.length);
+  // Modificar parámetro del sandbox
+  const handleParamChange = (key: string, value: string) => {
+    const val = parseFloat(value);
+    setStudyParams(prev => ({ ...prev, [key]: isNaN(val) ? 0 : val }));
   };
 
-  // Renderizador principal por pantallas
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const currentHistorial = historial.filter(h => h.usuario === currentUser);
+  const averageScore = currentHistorial.length > 0 
+    ? Math.round(currentHistorial.reduce((acc, curr) => acc + curr.nota, 0) / currentHistorial.length) 
+    : 0;
+
+  // Si no está autenticado, forzar pantalla de AUTH
+  if (!currentUser) {
+    return (
+      <div className="container fade-in" style={{ maxWidth: '480px', marginTop: '80px' }}>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontSize: '2rem', background: 'linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block', marginBottom: '8px' }}>
+              EFA Prep Platform
+            </h1>
+            <p>Accede a tu simulador inteligente oficial</p>
+          </div>
+
+          {authSuccessMsg && (
+            <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid var(--success)', padding: '12px', borderRadius: '8px', color: '#8dfcb9', fontSize: '0.9rem' }}>
+              {authSuccessMsg}
+            </div>
+          )}
+
+          {errorMsg && (
+            <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error)', padding: '12px', borderRadius: '8px', color: '#ff8a8a', fontSize: '0.9rem' }}>
+              {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Usuario</label>
+              <div style={{ position: 'relative' }}>
+                <User size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  required
+                  value={authUsername}
+                  onChange={(e) => setAuthUsername(e.target.value)}
+                  placeholder="Introduce tu usuario"
+                  style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Contraseña</label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                <input
+                  type="password"
+                  required
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Introduce tu contraseña"
+                  style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }} disabled={isSubmitting}>
+              {authMode === 'LOGIN' ? 'Iniciar Sesión' : 'Registrarse'}
+            </button>
+          </form>
+
+          <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+            <button 
+              style={{ background: 'none', border: 'none', color: 'var(--secondary)', cursor: 'pointer', fontSize: '0.9rem' }}
+              onClick={() => {
+                setAuthMode(authMode === 'LOGIN' ? 'REGISTER' : 'LOGIN');
+                setErrorMsg('');
+                setAuthSuccessMsg('');
+              }}
+            >
+              {authMode === 'LOGIN' ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // APP CON LOGIN ACTIVO
   return (
     <div className="container fade-in">
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '2.2rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h1 style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ background: 'linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>EFA Prep</span>
-            <span style={{ fontSize: '1rem', padding: '4px 8px', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', color: 'var(--text-secondary)', fontWeight: 400 }}>Pro 2026</span>
+            <span style={{ fontSize: '0.85rem', padding: '2px 8px', background: 'var(--primary)', borderRadius: '12px', color: '#fff' }}>Estudiante</span>
           </h1>
         </div>
-        {screen !== 'DASHBOARD' && (
-          <button className="btn btn-secondary" onClick={() => setScreen('DASHBOARD')}>
-            Volver al Panel
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+            <User size={16} />
+            <span style={{ fontWeight: 500, color: '#fff' }}>{currentUser}</span>
+          </div>
+
+          {screen !== 'DASHBOARD' && (
+            <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.9rem' }} onClick={() => setScreen('DASHBOARD')}>
+              Volver al Panel
+            </button>
+          )}
+
+          <button className="btn btn-danger" style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', color: 'var(--error)' }} onClick={handleLogout}>
+            <LogOut size={16} />
           </button>
-        )}
+        </div>
       </header>
 
       {errorMsg && (
@@ -204,13 +403,13 @@ export default function App() {
       {/* PANTALLA: DASHBOARD */}
       {screen === 'DASHBOARD' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '40px' }}>
             <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{ background: 'rgba(138, 43, 226, 0.15)', padding: '16px', borderRadius: '12px' }}>
                 <TrendingUp style={{ color: 'var(--primary)', width: '32px', height: '32px' }} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.8rem' }}>{calculateGlobalAverage()}%</h3>
+                <h3 style={{ fontSize: '1.8rem' }}>{averageScore}%</h3>
                 <p>Media de Preparación</p>
               </div>
             </div>
@@ -220,7 +419,7 @@ export default function App() {
                 <Award style={{ color: 'var(--secondary)', width: '32px', height: '32px' }} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.8rem' }}>{historial.filter(h => h.aprobado).length}</h3>
+                <h3 style={{ fontSize: '1.8rem' }}>{currentHistorial.filter(h => h.aprobado).length}</h3>
                 <p>Simulaciones Aprobadas</p>
               </div>
             </div>
@@ -230,28 +429,33 @@ export default function App() {
                 <BookOpen style={{ color: '#fff', width: '32px', height: '32px' }} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.8rem' }}>{historial.length}</h3>
+                <h3 style={{ fontSize: '1.8rem' }}>{currentHistorial.length}</h3>
                 <p>Exámenes Realizados</p>
               </div>
             </div>
           </div>
 
-          <h2 style={{ marginBottom: '24px', fontSize: '1.5rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px' }}>
-            Iniciar Nueva Simulación Oficial (MiFID II Compliant)
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '1.5rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px' }}>
+              Actividades Académicas Disponibles
+            </h2>
+            <button className="btn btn-accent" onClick={() => setScreen('STUDY')}>
+              <Calculator size={18} /> Sandbox de Estudio
+            </button>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '40px' }}>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '260px' }}>
               <div>
                 <h3 style={{ marginBottom: '8px', color: '#fff', fontSize: '1.3rem' }}>EIP Nivel I</h3>
-                <p style={{ marginBottom: '20px' }}>Simulador del examen parcial oficial de acceso nivel I. 40 preguntas tipo test.</p>
+                <p style={{ marginBottom: '20px' }}>Simulación del examen oficial de acceso nivel I. 40 preguntas tipo test.</p>
                 <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={16} /> 1h 30m</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookOpen size={16} /> 40 Preguntas</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookIcon size={16} /> 40 Preguntas</span>
                 </div>
               </div>
               <button className="btn btn-primary" onClick={() => handleStartExam('EIP')} disabled={isSubmitting}>
-                <Play size={18} /> Iniciar Simulación
+                <Play size={18} /> Iniciar Test
               </button>
             </div>
 
@@ -259,36 +463,36 @@ export default function App() {
               <div>
                 <h3 style={{ marginBottom: '8px', color: '#fff', fontSize: '1.3rem', display: 'flex', justifyContent: 'space-between' }}>
                   EFA Completo
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--primary)', borderRadius: '12px', color: '#fff' }}>Recomendado</span>
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--primary)', borderRadius: '12px', color: '#fff' }}>Oficial</span>
                 </h3>
-                <p style={{ marginBottom: '20px' }}>Examen completo directo EFA. 50 preguntas tipo test más 1 caso de desarrollo financiero práctico.</p>
+                <p style={{ marginBottom: '20px' }}>Examen de certificación directa EFA. 50 preguntas tipo test y 1 caso práctico de desarrollo fiscal/financiero.</p>
                 <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={16} /> 2h 30m</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookOpen size={16} /> 50 Test + 1 Caso</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookIcon size={16} /> 50 Test + 1 Caso</span>
                 </div>
               </div>
               <button className="btn btn-accent" onClick={() => handleStartExam('EFA Completo')} disabled={isSubmitting}>
-                <Play size={18} /> Iniciar Simulación
+                <Play size={18} /> Iniciar Examen
               </button>
             </div>
 
             <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '260px' }}>
               <div>
                 <h3 style={{ marginBottom: '8px', color: '#fff', fontSize: '1.3rem' }}>EFA Nivel II</h3>
-                <p style={{ marginBottom: '20px' }}>Examen de Nivel II para candidatos con el nivel I superado. 40 preguntas tipo test más 1 caso práctico.</p>
+                <p style={{ marginBottom: '20px' }}>Simulador del examen Nivel II. 40 preguntas tipo test y 1 caso práctico.</p>
                 <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={16} /> 2h 30m</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookOpen size={16} /> 40 Test + 1 Caso</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookIcon size={16} /> 40 Test + 1 Caso</span>
                 </div>
               </div>
               <button className="btn btn-primary" onClick={() => handleStartExam('EFA Nivel II')} disabled={isSubmitting}>
-                <Play size={18} /> Iniciar Simulación
+                <Play size={18} /> Iniciar Nivel II
               </button>
             </div>
           </div>
 
           <h2 style={{ marginBottom: '24px', fontSize: '1.5rem', borderLeft: '4px solid var(--secondary)', paddingLeft: '12px' }}>
-            Historial de Intentos Recientes
+            Tus Intentos Recientes
           </h2>
           <div className="card" style={{ padding: '0px', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -301,30 +505,325 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {historial.map((h, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '16px', fontWeight: 500, color: '#fff' }}>{h.tipo}</td>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{h.fecha}</td>
-                    <td style={{ padding: '16px', fontWeight: 600, color: h.aprobado ? 'var(--success)' : 'var(--error)' }}>
-                      {h.nota}%
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={{ 
-                        padding: '4px 10px', 
-                        borderRadius: '20px', 
-                        fontSize: '0.8rem', 
-                        fontWeight: 600,
-                        background: h.aprobado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: h.aprobado ? 'var(--success)' : 'var(--error)',
-                        border: `1px solid ${h.aprobado ? 'var(--success)' : 'var(--error)'}`
-                      }}>
-                        {h.aprobado ? 'APROBADO' : 'SUSPENDIDO'}
-                      </span>
+                {currentHistorial.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      No tienes intentos registrados aún. ¡Comienza a estudiar o realiza un examen!
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  currentHistorial.map((h, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '16px', fontWeight: 500, color: '#fff' }}>{h.tipo}</td>
+                      <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{h.fecha}</td>
+                      <td style={{ padding: '16px', fontWeight: 600, color: h.aprobado ? 'var(--success)' : 'var(--error)' }}>
+                        {h.nota}%
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{ 
+                          padding: '4px 10px', 
+                          borderRadius: '20px', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 600,
+                          background: h.aprobado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: h.aprobado ? 'var(--success)' : 'var(--error)',
+                          border: `1px solid ${h.aprobado ? 'var(--success)' : 'var(--error)'}`
+                        }}>
+                          {h.aprobado ? 'APROBADO' : 'SUSPENDIDO'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* PANTALLA: SANDBOX DE ESTUDIO */}
+      {screen === 'STUDY' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
+          {/* Parámetros de la fórmula */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--secondary)', paddingLeft: '12px' }}>
+              Calculadora Sandbox de Fórmulas
+            </h3>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Selecciona la Fórmula a Estudiar
+              </label>
+              <select
+                value={selectedFormula}
+                onChange={(e) => {
+                  setSelectedFormula(e.target.value);
+                  setStudyResult(null);
+                }}
+                style={{
+                  width: '100%',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '1px solid var(--border-color)',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '1rem',
+                  outline: 'none'
+                }}
+              >
+                <option value="gordon_shapiro">Gordon-Shapiro (Precio Teórico Acción)</option>
+                <option value="sharpe">Ratio de Sharpe (Rendimiento/Volatilidad)</option>
+                <option value="treynor">Ratio de Treynor (Rendimiento/Beta)</option>
+                <option value="jensen">Alfa de Jensen (Frente a CAPM)</option>
+                <option value="tae">Conversión TIN a TAE (Interés Compuesto)</option>
+                <option value="precio_bono">Precio de un Bono de Renta Fija</option>
+                <option value="irpf_ahorro">Escala de Gravamen del Ahorro IRPF (España 2026)</option>
+              </select>
+            </div>
+
+            {/* Inputs dinámicos según fórmula */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '12px' }}>
+              {selectedFormula === 'gordon_shapiro' && (
+                <>
+                  <div>
+                    <label>D1 (Dividendo esperado)</label>
+                    <input type="number" step="0.01" value={studyParams.d1} onChange={(e) => handleParamChange('d1', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>ke (Rentabilidad exigida)</label>
+                    <input type="number" step="0.001" value={studyParams.ke} onChange={(e) => handleParamChange('ke', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>g (Tasa de crecimiento)</label>
+                    <input type="number" step="0.001" value={studyParams.g} onChange={(e) => handleParamChange('g', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {selectedFormula === 'sharpe' && (
+                <>
+                  <div>
+                    <label>Rp (Rentabilidad cartera)</label>
+                    <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Rf (Tasa libre riesgo)</label>
+                    <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>σp (Desviación estándar)</label>
+                    <input type="number" step="0.001" value={studyParams.sigma_p} onChange={(e) => handleParamChange('sigma_p', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {selectedFormula === 'treynor' && (
+                <>
+                  <div>
+                    <label>Rp (Rentabilidad cartera)</label>
+                    <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Rf (Tasa libre riesgo)</label>
+                    <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>βp (Beta de la cartera)</label>
+                    <input type="number" step="0.01" value={studyParams.beta_p} onChange={(e) => handleParamChange('beta_p', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {selectedFormula === 'jensen' && (
+                <>
+                  <div>
+                    <label>Rp (Rentabilidad cartera)</label>
+                    <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Rf (Tasa libre riesgo)</label>
+                    <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>βp (Beta de la cartera)</label>
+                    <input type="number" step="0.01" value={studyParams.beta_p} onChange={(e) => handleParamChange('beta_p', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Rm (Rentabilidad mercado)</label>
+                    <input type="number" step="0.001" value={studyParams.rm} onChange={(e) => handleParamChange('rm', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {selectedFormula === 'tae' && (
+                <>
+                  <div>
+                    <label>TIN (Interés Nominal)</label>
+                    <input type="number" step="0.001" value={studyParams.tin} onChange={(e) => handleParamChange('tin', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>m (Liquidaciones al año)</label>
+                    <input type="number" step="1" value={studyParams.m} onChange={(e) => handleParamChange('m', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {selectedFormula === 'precio_bono' && (
+                <>
+                  <div>
+                    <label>Valor Nominal</label>
+                    <input type="number" value={studyParams.nominal} onChange={(e) => handleParamChange('nominal', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Cupón anual (%)</label>
+                    <input type="number" step="0.001" value={studyParams.cupon_anual_pct} onChange={(e) => handleParamChange('cupon_anual_pct', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Vencimiento (años)</label>
+                    <input type="number" value={studyParams.n_anos} onChange={(e) => handleParamChange('n_anos', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>TIR exigida</label>
+                    <input type="number" step="0.001" value={studyParams.tir} onChange={(e) => handleParamChange('tir', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {selectedFormula === 'irpf_ahorro' && (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label>Base liquidable del ahorro (€)</label>
+                  <input type="number" value={studyParams.base_liquidable} onChange={(e) => handleParamChange('base_liquidable', e.target.value)} style={{ width: '100%' }} />
+                </div>
+              )}
+            </div>
+
+            <button className="btn btn-accent" onClick={handleCalculateStudy} disabled={isSubmitting}>
+              {isSubmitting ? 'Calculando...' : 'Calcular en Sandbox'}
+            </button>
+          </div>
+
+          {/* Visualización académica */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '380px', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px', marginBottom: '16px' }}>
+                Explicación Matemática de la Fórmula
+              </h3>
+
+              {selectedFormula === 'gordon_shapiro' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Fórmula de Gordon-Shapiro:</p>
+                  <div className="math-block">
+                    {"$$P_0 = \\frac{D_1}{K_e - g}$$"}
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    Estima el valor intrínseco de una acción asumiendo crecimiento constante indefinido de los dividendos ($g$) a una tasa menor que la rentabilidad exigida ($K_e$).
+                  </p>
+                </div>
+              )}
+
+              {selectedFormula === 'sharpe' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Ratio de Sharpe:</p>
+                  <div className="math-block">
+                    {"$$Sharpe = \\frac{R_p - R_f}{\\sigma_p}$$"}
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    Mide la rentabilidad excedente obtenida por unidad de riesgo total (volatilidad).
+                  </p>
+                </div>
+              )}
+
+              {selectedFormula === 'treynor' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Ratio de Treynor:</p>
+                  <div className="math-block">
+                    {"$$Treynor = \\frac{R_p - R_f}{\\beta_p}$$"}
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    Mide el exceso de rendimiento de la cartera sobre la tasa libre de riesgo por unidad de riesgo sistemático (Beta).
+                  </p>
+                </div>
+              )}
+
+              {selectedFormula === 'jensen' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Alfa de Jensen:</p>
+                  <div className="math-block">
+                    {"$$\\alpha_p = R_p - [R_f + \\beta_p(R_m - R_f)]$$"}
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    Representa el exceso de retorno de una cartera frente a su retorno teórico CAPM. Un alfa positivo indica gestión activa exitosa.
+                  </p>
+                </div>
+              )}
+
+              {selectedFormula === 'tae' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Tasa Anual Equivalente:</p>
+                  <div className="math-block">
+                    {"$$TAE = \\left(1 + \\frac{TIN}{m}\\right)^m - 1$$"}
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    Equivalencia de capitalización compuesta con liquidaciones periódicas de frecuencia $m$.
+                  </p>
+                </div>
+              )}
+
+              {selectedFormula === 'precio_bono' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Precio de un Bono de Renta Fija:</p>
+                  <div className="math-block">
+                    {"$$P = \\sum_{t=1}^{n} \\frac{C_t}{(1+y)^t} + \\frac{N}{(1+y)^n}$$"}
+                  </div>
+                </div>
+              )}
+
+              {selectedFormula === 'irpf_ahorro' && (
+                <div>
+                  <p style={{ marginBottom: '12px' }}>Escala del IRPF del ahorro (2026):</p>
+                  <p style={{ fontSize: '0.9rem' }}>Hasta 6.000 €: <strong>19%</strong></p>
+                  <p style={{ fontSize: '0.9rem' }}>De 6.000 a 50.000 €: <strong>21%</strong></p>
+                  <p style={{ fontSize: '0.9rem' }}>De 50.000 a 200.000 €: <strong>23%</strong></p>
+                  <p style={{ fontSize: '0.9rem' }}>De 200.000 a 300.000 €: <strong>27%</strong></p>
+                  <p style={{ fontSize: '0.9rem' }}>Más de 300.000 €: <strong>28%</strong></p>
+                </div>
+              )}
+            </div>
+
+            {studyResult && (
+              <div style={{ background: 'rgba(0,229,255,0.06)', padding: '16px', borderRadius: '12px', border: '1px solid var(--secondary)' }}>
+                <h4 style={{ color: 'var(--secondary)', marginBottom: '8px', fontSize: '0.95rem' }}>Resultado del Sandbox</h4>
+                {selectedFormula === 'gordon_shapiro' && (
+                  <div>
+                    <p style={{ color: '#fff' }}>Denominador neto (ke - g): <strong>{studyResult.denominador * 100}%</strong></p>
+                    <p style={{ color: '#fff', fontSize: '1.2rem', marginTop: '6px' }}>Precio teórico: <strong>{Math.round(studyResult.precio_teorico * 100) / 100} €</strong></p>
+                  </div>
+                )}
+                
+                {selectedFormula === 'irpf_ahorro' && (
+                  <div>
+                    <p style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '8px' }}>Cuota Total: <strong>{studyResult.cuota_total.toFixed(2)} €</strong></p>
+                    <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {studyResult.desglose.map((t: any, idx: number) => (
+                        <div key={idx}>{t.tramo}: {t.cuota_tramo.toFixed(2)} € (Base: {t.base_tramo} €)</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {['sharpe', 'treynor', 'jensen', 'tae', 'precio_bono'].includes(selectedFormula) && (
+                  <div>
+                    <p style={{ color: '#fff', fontSize: '1.3rem' }}>
+                      Valor: <strong>{typeof studyResult.result === 'number' ? (Math.round(studyResult.result * 100000) / 100000).toLocaleString() : JSON.stringify(studyResult)}</strong>
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setScreen('DASHBOARD')}>
+              Volver al Dashboard
+            </button>
           </div>
         </div>
       )}
@@ -333,9 +832,8 @@ export default function App() {
       {screen === 'SIMULATOR' && activeExam && (
         <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px' }}>
           
-          {/* Navegador lateral */}
           <aside className="card" style={{ padding: '20px', height: 'fit-content' }}>
-            <div style={{ display: 'flex', justifySelf: 'center', alignItems: 'center', gap: '8px', marginBottom: '24px', background: 'rgba(255,255,255,0.04)', padding: '10px 16px', borderRadius: '12px', width: '100%', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', background: 'rgba(255,255,255,0.04)', padding: '10px 16px', borderRadius: '12px', width: '100%', justifyContent: 'center' }}>
               <Clock style={{ color: 'var(--secondary)' }} />
               <span style={{ fontSize: '1.4rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#fff' }}>
                 {formatTime(timer)}
@@ -398,10 +896,8 @@ export default function App() {
             </button>
           </aside>
 
-          {/* Área de Pregunta */}
           <main className="card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             {selectedQuestionIndex < activeExam.preguntas_test.length ? (
-              // Pregunta de Test
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <span style={{ fontSize: '0.85rem', color: 'var(--secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
@@ -449,7 +945,6 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              // Pregunta Práctica
               activeExam.pregunta_practica && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -467,13 +962,13 @@ export default function App() {
 
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                      Tu respuesta (Redacta las fórmulas, el desglose de cálculo paso a paso y la argumentación cualitativa):
+                      Tu respuesta razonada:
                     </label>
                     <textarea
                       rows={12}
                       value={answersPrac[activeExam.pregunta_practica.id] || ''}
                       onChange={(e) => setAnswersPrac(prev => ({ ...prev, [activeExam.pregunta_practica!.id]: e.target.value }))}
-                      placeholder="Escribe aquí tu desglose aritmético y justificación cualitativa..."
+                      placeholder="Redacta la explicación de variables y muestra las aserciones cuantitativas obtenidas..."
                       style={{
                         width: '100%',
                         background: 'rgba(0,0,0,0.2)',
@@ -493,7 +988,6 @@ export default function App() {
               )
             )}
 
-            {/* Controles de Navegación */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
               <button
                 className="btn btn-secondary"
@@ -527,7 +1021,6 @@ export default function App() {
       {screen === 'RESULTS' && activeReport && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           
-          {/* Ficha Resumen */}
           <div className="card" style={{ 
             borderLeft: `8px solid ${activeReport.aprobado_general ? 'var(--success)' : 'var(--error)'}`,
             background: activeReport.aprobado_general ? 'rgba(16, 185, 129, 0.04)' : 'rgba(239, 68, 68, 0.04)'
@@ -575,7 +1068,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Detalle Práctica */}
           {activeReport.evaluacion_practica && (
             <div className="card">
               <h3 style={{ fontSize: '1.4rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#fff' }}>
@@ -605,7 +1097,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Detalle de Preguntas de Test */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px', color: '#fff' }}>
               Desglose de Preguntas Teóricas

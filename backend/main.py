@@ -29,6 +29,30 @@ app.add_middleware(
 
 # Almacenamiento en memoria de sesiones de examen activas
 active_sessions: dict[str, dict] = {}
+users_db: dict[str, str] = {}
+
+class UserAuth(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/register")
+def api_register(user: UserAuth):
+    if user.username in users_db:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El usuario ya existe."
+        )
+    users_db[user.username] = user.password
+    return {"message": "Usuario registrado con éxito."}
+
+@app.post("/api/auth/login")
+def api_login(user: UserAuth):
+    if user.username not in users_db or users_db[user.username] != user.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario o contraseña incorrectos."
+        )
+    return {"username": user.username, "token": f"mock-token-{uuid.uuid4().hex[:8]}"}
 
 class StartExamRequest(BaseModel):
     tipo_examen: str
