@@ -79,7 +79,9 @@ def api_start_exam(req: StartExamRequest):
     active_sessions[session_id] = {
         "tipo_examen": examen["tipo_examen"],
         "ids_originales_test": examen["ids_originales_test"],
-        "id_practica_original": examen["id_practica_original"]
+        "id_practica_original": examen["id_practica_original"],
+        "respuestas_correctas_test": examen["respuestas_correctas_test"],
+        "opciones_mezcladas_test": {str(q["id"]): q["opciones"] for q in examen["preguntas_test"]}
     }
     
     # Retornamos el examen limpio al frontend
@@ -116,7 +118,8 @@ def api_submit_exam(req: SubmitExamRequest):
         alumno_ans = req.respuestas_test.get(str(qid))
         
         es_correcta = False
-        if alumno_ans is not None and alumno_ans == original.respuesta_correcta:
+        correct_ans_index = session["respuestas_correctas_test"].get(str(qid))
+        if alumno_ans is not None and alumno_ans == correct_ans_index:
             es_correcta = True
             aciertos += 1
             
@@ -124,9 +127,9 @@ def api_submit_exam(req: SubmitExamRequest):
             "id": original.id,
             "modulo": original.modulo,
             "enunciado": original.enunciado,
-            "opciones": original.opciones,
+            "opciones": session["opciones_mezcladas_test"].get(str(qid)),
             "respuesta_alumno": alumno_ans,
-            "respuesta_correcta": original.respuesta_correcta,
+            "respuesta_correcta": correct_ans_index,
             "es_correcta": es_correcta,
             "explicacion": original.explicacion
         })

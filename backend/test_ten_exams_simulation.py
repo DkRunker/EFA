@@ -86,7 +86,10 @@ def test_student_lifecycle_with_ten_exams():
             if es_estudioso_en_este:
                 # Buscamos el original para responder correctamente
                 original_q = next(x for x in PREGUNTAS_TEST if x.id == q["id"])
-                respuestas_test[str(q["id"])] = original_q.respuesta_correcta
+                correcta_texto = original_q.opciones[original_q.respuesta_correcta]
+                # Encontramos en qué índice de las opciones barajadas se encuentra el texto correcto
+                nueva_correcta = q["opciones"].index(correcta_texto)
+                respuestas_test[str(q["id"])] = nueva_correcta
             else:
                 respuestas_test[str(q["id"])] = 2 # Falta de conocimientos
                 
