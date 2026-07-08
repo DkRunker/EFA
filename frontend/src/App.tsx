@@ -1420,12 +1420,13 @@ export default function App() {
                 })}
               </aside>
 
-              {/* Visualizador de apuntes */}
-              <main className="card" style={{ height: 'calc(100vh - 220px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem', overflowY: 'auto', flex: 1, paddingRight: '8px', marginBottom: '16px' }}>
+              {/* Visualizador de apuntes: el panel crece con el contenido y la
+                  página hace scroll de forma natural (la barra lateral es sticky). */}
+              <main className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
                   <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(apuntesContent) }} />
                 </div>
-                
+
                 <button className="btn btn-secondary" style={{ width: 'fit-content' }} onClick={() => setScreen('DASHBOARD')}>
                   Volver al Dashboard
                 </button>
