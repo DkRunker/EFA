@@ -24,18 +24,23 @@ function renderMarkdownToHtml(markdown: string): string {
 
   const mathPlaceholders: string[] = [];
   
+  // Token inerte para markdown: solo letras y dígitos, SIN guiones bajos ni
+  // asteriscos, para que el procesado de negrita/cursiva (** __ * _) no lo
+  // corrompa y la restauración posterior siempre encuentre el marcador exacto.
+  const mathToken = (idx: number) => `MATHTKN${idx}MATHEND`;
+
   // 1. Ocultar fórmulas en bloque $$...$$
   let processed = markdown.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
     const idx = mathPlaceholders.length;
     mathPlaceholders.push(match);
-    return `__MATH_PLACEHOLDER_${idx}__`;
+    return mathToken(idx);
   });
 
   // 2. Ocultar fórmulas en línea $...$
   processed = processed.replace(/\$([^$\n]+?)\$/g, (match) => {
     const idx = mathPlaceholders.length;
     mathPlaceholders.push(match);
-    return `__MATH_PLACEHOLDER_${idx}__`;
+    return mathToken(idx);
   });
 
   const lines = processed.split('\n');
@@ -97,8 +102,8 @@ function renderMarkdownToHtml(markdown: string): string {
     const trimmed = line.trim();
 
     // 3. Caso especial: Fórmulas en bloque que están solas en su línea
-    if (trimmed.startsWith('__MATH_PLACEHOLDER_') && trimmed.endsWith('__')) {
-      const match = trimmed.match(/__MATH_PLACEHOLDER_(\d+)__/);
+    if (trimmed.startsWith('MATHTKN') && trimmed.endsWith('MATHEND')) {
+      const match = trimmed.match(/^MATHTKN(\d+)MATHEND$/);
       if (match) {
         const idx = parseInt(match[1], 10);
         const originalMath = mathPlaceholders[idx];
@@ -132,7 +137,7 @@ function renderMarkdownToHtml(markdown: string): string {
 
     // 5. Listas de viñetas (bullet points)
     const bulletMatch = line.match(/^(\s*)([-*])\s+(.*)$/);
-    if (bulletMatch && !trimmed.startsWith('__MATH_PLACEHOLDER_')) {
+    if (bulletMatch && !trimmed.startsWith('MATHTKN')) {
       flushParagraph();
       if (inList !== 'ul') {
         flushList();
@@ -181,7 +186,7 @@ function renderMarkdownToHtml(markdown: string): string {
   // 9. Restaurar las fórmulas matemáticas originales en el HTML
   let finalHtml = htmlBlocks.join('\n');
   for (let i = 0; i < mathPlaceholders.length; i++) {
-    finalHtml = finalHtml.replaceAll(`__MATH_PLACEHOLDER_${i}__`, mathPlaceholders[i]);
+    finalHtml = finalHtml.replaceAll(`MATHTKN${i}MATHEND`, mathPlaceholders[i]);
   }
 
   return finalHtml;
