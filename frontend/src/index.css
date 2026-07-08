@@ -47,6 +47,22 @@ body {
   overflow-x: hidden;
 }
 
+/* Desplegables nativos en modo oscuro: la lista de opciones necesita un fondo
+   SÓLIDO (no semitransparente) para que no se pinte en gris con texto ilegible. */
+select {
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+select option:checked,
+select option:hover {
+  background-color: var(--primary);
+  color: #fff;
+}
+
 /* Glassmorphism Card Style */
 .card {
   background: var(--bg-card);
