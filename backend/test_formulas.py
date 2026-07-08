@@ -6,7 +6,15 @@ from backend.formulas import (
     calcular_jensen,
     calcular_tae,
     calcular_precio_bono,
-    calcular_irpf_ahorro
+    calcular_irpf_ahorro,
+    calcular_duracion_bono,
+    calcular_tipo_forward,
+    calcular_tipo_cambio_forward,
+    calcular_ratio_informacion,
+    calcular_ratio_sortino,
+    calcular_cartera_dos_activos,
+    calcular_valoracion_inmobiliaria,
+    calcular_amortizacion_francesa
 )
 
 # 1. Tests Gordon-Shapiro
@@ -70,3 +78,54 @@ def test_irpf_ahorro_alto():
     # Total = 1.140 + 9.240 + 34.500 + 27.000 + 28.000 = 99.880 €
     res = calcular_irpf_ahorro(base_liquidable=400000.0)
     assert res["cuota_total"] == pytest.approx(99880.0)
+
+
+# 6. Tests Duración y Convexidad del Bono
+def test_duracion_bono():
+    res = calcular_duracion_bono(nominal=1000.0, cupon_anual_pct=0.05, n_anos=3, tir=0.04, frecuencia=1)
+    assert res["precio"] == pytest.approx(1027.75, abs=1e-2)
+    assert res["macaulay"] == pytest.approx(2.86, abs=1e-2)
+    assert res["modificada"] == pytest.approx(2.75, abs=1e-2)
+    assert res["convexidad"] == pytest.approx(10.41, abs=1e-2)
+
+
+# 7. Tests Tipo Forward
+def test_tipo_forward():
+    res = calcular_tipo_forward(s1=0.03, s2=0.04, t1=1.0, t2=2.0)
+    assert res == pytest.approx(0.0501, abs=1e-4)
+
+
+# 8. Tests Tipo de Cambio Forward
+def test_tipo_cambio_forward():
+    res = calcular_tipo_cambio_forward(spot=1.10, r_dom=0.035, r_for=0.02, dias=180)
+    assert res == pytest.approx(1.108168, abs=1e-5)
+
+
+# 9. Tests Ratios Sharpe, Treynor, Jensen e Información/Sortino
+def test_ratio_informacion():
+    res = calcular_ratio_informacion(rp=0.10, rb=0.08, tracking_error=0.04)
+    assert res == pytest.approx(0.50)
+
+
+def test_ratio_sortino():
+    res = calcular_ratio_sortino(rp=0.12, rf=0.02, downside_deviation=0.05)
+    assert res == pytest.approx(2.00)
+
+
+# 10. Tests Cartera de Dos Activos
+def test_cartera_dos_activos():
+    res = calcular_cartera_dos_activos(w1=0.6, w2=0.4, r1=0.10, r2=0.15, sigma1=0.08, sigma2=0.12, correlacion=-0.5)
+    assert res["retorno_cartera"] == pytest.approx(0.12)
+    assert res["volatilidad_cartera"] == pytest.approx(0.048)
+
+
+# 11. Tests Valoración Inmobiliaria
+def test_valoracion_inmobiliaria():
+    res = calcular_valoracion_inmobiliaria(renta_neta=12000.0, cap_rate=0.06)
+    assert res == pytest.approx(200000.0)
+
+
+# 12. Tests Amortización Francesa
+def test_amortizacion_francesa():
+    res = calcular_amortizacion_francesa(nominal=100000.0, tin=0.03, n_anos=20, frecuencia=12)
+    assert res["cuota_periodica"] == pytest.approx(554.60, abs=1e-2)

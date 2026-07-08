@@ -1,6 +1,8 @@
+import os
 import uuid
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Any
 
@@ -13,7 +15,15 @@ from backend.formulas import (
     calcular_jensen,
     calcular_tae,
     calcular_precio_bono,
-    calcular_irpf_ahorro
+    calcular_irpf_ahorro,
+    calcular_duracion_bono,
+    calcular_tipo_forward,
+    calcular_tipo_cambio_forward,
+    calcular_ratio_informacion,
+    calcular_ratio_sortino,
+    calcular_cartera_dos_activos,
+    calcular_valoracion_inmobiliaria,
+    calcular_amortizacion_francesa
 )
 
 app = FastAPI(title="EFA Prep Platform API", version="1.0.0")
@@ -211,6 +221,27 @@ def api_calculate_formula(req: CalculateFormulaRequest):
             return {"result": val}
         elif formula == "irpf_ahorro":
             return calcular_irpf_ahorro(base_liquidable=p["base_liquidable"])
+        elif formula == "duracion_bono":
+            return calcular_duracion_bono(nominal=p["nominal"], cupon_anual_pct=p["cupon_anual_pct"], n_anos=p["n_anos"], tir=p["tir"], frecuencia=p.get("frecuencia", 1))
+        elif formula == "tipo_forward":
+            val = calcular_tipo_forward(s1=p["s1"], s2=p["s2"], t1=p["t1"], t2=p["t2"])
+            return {"result": val}
+        elif formula == "tipo_cambio_forward":
+            val = calcular_tipo_cambio_forward(spot=p["spot"], r_dom=p["r_dom"], r_for=p["r_for"], dias=int(p["dias"]))
+            return {"result": val}
+        elif formula == "ratio_informacion":
+            val = calcular_ratio_informacion(rp=p["rp"], rb=p["rb"], tracking_error=p["tracking_error"])
+            return {"result": val}
+        elif formula == "ratio_sortino":
+            val = calcular_ratio_sortino(rp=p["rp"], rf=p["rf"], downside_deviation=p["downside_deviation"])
+            return {"result": val}
+        elif formula == "cartera_dos_activos":
+            return calcular_cartera_dos_activos(w1=p["w1"], w2=p["w2"], r1=p["r1"], r2=p["r2"], sigma1=p["sigma1"], sigma2=p["sigma2"], correlacion=p["correlacion"])
+        elif formula == "valoracion_inmobiliaria":
+            val = calcular_valoracion_inmobiliaria(renta_neta=p["renta_neta"], cap_rate=p["cap_rate"])
+            return {"result": val}
+        elif formula == "amortizacion_francesa":
+            return calcular_amortizacion_francesa(nominal=p["nominal"], tin=p["tin"], n_anos=p["n_anos"], frecuencia=p.get("frecuencia", 12))
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fórmula no soportada")
     except Exception as e:
@@ -229,3 +260,15 @@ def api_get_apunte_modulo(modulo_id: str):
             detail=f"Apuntes para el módulo {modulo_id} no encontrados."
         )
     return {"modulo": modulo_id, "apuntes": APUNTES_TEORICOS[modulo_id]}
+
+
+# --- Servido del frontend compilado (modo portable) ---
+# Si existe el build del frontend (frontend/dist), se sirve como aplicación web
+# en la raíz "/", de modo que backend y frontend corran en el mismo origen (puerto).
+# Las rutas /api/* declaradas arriba tienen prioridad sobre este montaje.
+# La ruta puede forzarse con la variable de entorno EFA_FRONTEND_DIST (empaquetado portable).
+_FRONTEND_DIST = os.environ.get("EFA_FRONTEND_DIST") or os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "frontend", "dist"
+)
+if os.path.isdir(_FRONTEND_DIST):
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")

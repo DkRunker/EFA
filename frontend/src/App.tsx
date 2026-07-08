@@ -19,6 +19,174 @@ import {
 } from 'lucide-react';
 import type { ExamenSession, ExamenReport } from './types';
 
+function renderMarkdownToHtml(markdown: string): string {
+  if (!markdown) return '';
+
+  const mathPlaceholders: string[] = [];
+  
+  // 1. Ocultar fórmulas en bloque $$...$$
+  let processed = markdown.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+    const idx = mathPlaceholders.length;
+    mathPlaceholders.push(match);
+    return `__MATH_PLACEHOLDER_${idx}__`;
+  });
+
+  // 2. Ocultar fórmulas en línea $...$
+  processed = processed.replace(/\$([^$\n]+?)\$/g, (match) => {
+    const idx = mathPlaceholders.length;
+    mathPlaceholders.push(match);
+    return `__MATH_PLACEHOLDER_${idx}__`;
+  });
+
+  const lines = processed.split('\n');
+  const htmlBlocks: string[] = [];
+  
+  let inList: 'ul' | 'ol' | null = null;
+  let currentListItemLines: string[] = [];
+  let paragraphLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length > 0) {
+      const pText = paragraphLines.join(' ');
+      const htmlText = renderInlineMarkdown(pText);
+      htmlBlocks.push(`<p style="margin-bottom: 12px; color: var(--text-primary);">${htmlText}</p>`);
+      paragraphLines = [];
+    }
+  };
+
+  const flushListItem = () => {
+    if (currentListItemLines.length > 0) {
+      const itemText = currentListItemLines.join(' ');
+      const htmlText = renderInlineMarkdown(itemText);
+      const listStyle = inList === 'ul' 
+        ? 'margin-left: 24px; margin-bottom: 8px; list-style-type: disc; color: var(--text-primary);' 
+        : 'margin-left: 24px; margin-bottom: 8px; list-style-type: decimal; color: var(--text-primary);';
+      htmlBlocks.push(`<li style="${listStyle}">${htmlText}</li>`);
+      currentListItemLines = [];
+    }
+  };
+
+  const flushList = () => {
+    flushListItem();
+    if (inList === 'ul') {
+      htmlBlocks.push('</ul>');
+    } else if (inList === 'ol') {
+      htmlBlocks.push('</ol>');
+    }
+    inList = null;
+  };
+
+  const renderInlineMarkdown = (text: string): string => {
+    let res = text;
+    // Negrita: **texto**
+    res = res.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Negrita: __texto__
+    res = res.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    // Cursiva: *texto*
+    res = res.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // Cursiva: _texto_ (evitando conflictos con placeholders)
+    res = res.replace(/_([^_]+)_/g, (match, p1) => {
+      if (p1.startsWith('MATH_PLACEHOLDER_')) return match;
+      return `<em>${p1}</em>`;
+    });
+    return res;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // 3. Caso especial: Fórmulas en bloque que están solas en su línea
+    if (trimmed.startsWith('__MATH_PLACEHOLDER_') && trimmed.endsWith('__')) {
+      const match = trimmed.match(/__MATH_PLACEHOLDER_(\d+)__/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        const originalMath = mathPlaceholders[idx];
+        if (originalMath && originalMath.startsWith('$$')) {
+          flushList();
+          flushParagraph();
+          htmlBlocks.push(`<div class="math-block">${trimmed}</div>`);
+          continue;
+        }
+      }
+    }
+
+    // 4. Encabezados (# a ######)
+    const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (headerMatch) {
+      flushList();
+      flushParagraph();
+      const level = headerMatch[1].length;
+      const headerText = renderInlineMarkdown(headerMatch[2].replace(/\s+#+$/, ''));
+      
+      let style = 'margin-top: 24px; margin-bottom: 12px; font-weight: 600; color: #fff;';
+      if (level === 1) style += 'font-size: 1.8rem; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;';
+      else if (level === 2) style += 'font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;';
+      else if (level === 3) style += 'font-size: 1.35rem; border-left: 4px solid var(--primary); padding-left: 12px; margin-bottom: 16px;';
+      else if (level === 4) style += 'font-size: 1.2rem; border-left: 3px solid var(--secondary); padding-left: 8px;';
+      else style += 'font-size: 1.05rem;';
+
+      htmlBlocks.push(`<h${level} style="${style}">${headerText}</h${level}>`);
+      continue;
+    }
+
+    // 5. Listas de viñetas (bullet points)
+    const bulletMatch = line.match(/^(\s*)([-*])\s+(.*)$/);
+    if (bulletMatch && !trimmed.startsWith('__MATH_PLACEHOLDER_')) {
+      flushParagraph();
+      if (inList !== 'ul') {
+        flushList();
+        inList = 'ul';
+        htmlBlocks.push('<ul style="margin-bottom: 12px; padding-left: 0;">');
+      } else {
+        flushListItem();
+      }
+      currentListItemLines.push(bulletMatch[3]);
+      continue;
+    }
+
+    // 6. Listas ordenadas
+    const numberedMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
+    if (numberedMatch) {
+      flushParagraph();
+      if (inList !== 'ol') {
+        flushList();
+        inList = 'ol';
+        htmlBlocks.push('<ol style="margin-bottom: 12px; padding-left: 0;">');
+      } else {
+        flushListItem();
+      }
+      currentListItemLines.push(numberedMatch[3]);
+      continue;
+    }
+
+    // 7. Líneas vacías
+    if (trimmed === '') {
+      flushList();
+      flushParagraph();
+      continue;
+    }
+
+    // 8. Líneas de párrafo normales
+    if (inList) {
+      currentListItemLines.push(trimmed);
+    } else {
+      paragraphLines.push(trimmed);
+    }
+  }
+
+  flushList();
+  flushParagraph();
+
+  // 9. Restaurar las fórmulas matemáticas originales en el HTML
+  let finalHtml = htmlBlocks.join('\n');
+  for (let i = 0; i < mathPlaceholders.length; i++) {
+    finalHtml = finalHtml.replaceAll(`__MATH_PLACEHOLDER_${i}__`, mathPlaceholders[i]);
+  }
+
+  return finalHtml;
+}
+
 export default function App() {
   // Autenticación
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -51,7 +219,14 @@ export default function App() {
     rp: 0.15, rf: 0.03, sigma_p: 0.08, beta_p: 1.2, rm: 0.10,
     tin: 0.06, m: 12,
     nominal: 1000.0, cupon_anual_pct: 0.05, n_anos: 3, tir: 0.04,
-    base_liquidable: 70000.0
+    base_liquidable: 70000.0,
+    frecuencia: 1,
+    s1: 0.03, s2: 0.04, t1: 1, t2: 2,
+    spot: 1.10, r_dom: 0.035, r_for: 0.02, dias: 180,
+    rb: 0.08, tracking_error: 0.04,
+    downside_deviation: 0.05,
+    w1: 0.6, w2: 0.4, r1: 0.10, r2: 0.15, sigma1: 0.08, sigma2: 0.12, correlacion: -0.5,
+    renta_neta: 12000.0, cap_rate: 0.06
   });
   const [studyResult, setStudyResult] = useState<any>(null);
 
@@ -270,6 +445,22 @@ export default function App() {
       params = { nominal: studyParams.nominal, cupon_anual_pct: studyParams.cupon_anual_pct, n_anos: Math.round(studyParams.n_anos), tir: studyParams.tir };
     } else if (selectedFormula === 'irpf_ahorro') {
       params = { base_liquidable: studyParams.base_liquidable };
+    } else if (selectedFormula === 'duracion_bono') {
+      params = { nominal: studyParams.nominal, cupon_anual_pct: studyParams.cupon_anual_pct, n_anos: Math.round(studyParams.n_anos), tir: studyParams.tir, frecuencia: Math.round(studyParams.frecuencia) };
+    } else if (selectedFormula === 'tipo_forward') {
+      params = { s1: studyParams.s1, s2: studyParams.s2, t1: studyParams.t1, t2: studyParams.t2 };
+    } else if (selectedFormula === 'tipo_cambio_forward') {
+      params = { spot: studyParams.spot, r_dom: studyParams.r_dom, r_for: studyParams.r_for, dias: Math.round(studyParams.dias) };
+    } else if (selectedFormula === 'ratio_informacion') {
+      params = { rp: studyParams.rp, rb: studyParams.rb, tracking_error: studyParams.tracking_error };
+    } else if (selectedFormula === 'ratio_sortino') {
+      params = { rp: studyParams.rp, rf: studyParams.rf, downside_deviation: studyParams.downside_deviation };
+    } else if (selectedFormula === 'cartera_dos_activos') {
+      params = { w1: studyParams.w1, w2: studyParams.w2, r1: studyParams.r1, r2: studyParams.r2, sigma1: studyParams.sigma1, sigma2: studyParams.sigma2, correlacion: studyParams.correlacion };
+    } else if (selectedFormula === 'valoracion_inmobiliaria') {
+      params = { renta_neta: studyParams.renta_neta, cap_rate: studyParams.cap_rate };
+    } else if (selectedFormula === 'amortizacion_francesa') {
+      params = { nominal: studyParams.nominal, tin: studyParams.tin, n_anos: Math.round(studyParams.n_anos), frecuencia: Math.round(studyParams.frecuencia) };
     }
 
     try {
@@ -623,6 +814,14 @@ export default function App() {
                     <option value="tae">Conversión TIN a TAE (Interés Compuesto)</option>
                     <option value="precio_bono">Precio de un Bono de Renta Fija</option>
                     <option value="irpf_ahorro">Escala de Gravamen del Ahorro IRPF (España 2026)</option>
+                    <option value="duracion_bono">Duración y Convexidad de Macaulay (Bono)</option>
+                    <option value="tipo_forward">Tipo de Interés Forward Implícito</option>
+                    <option value="tipo_cambio_forward">Tipo de Cambio Forward (Paridad de Interés)</option>
+                    <option value="ratio_informacion">Ratio de Información (Gestión Activa)</option>
+                    <option value="ratio_sortino">Ratio de Sortino (Riesgo de Pérdidas)</option>
+                    <option value="cartera_dos_activos">Cartera de Dos Activos (Retorno y Volatilidad)</option>
+                    <option value="valoracion_inmobiliaria">Valoración Inmobiliaria (Capitalización de Rentas)</option>
+                    <option value="amortizacion_francesa">Amortización de Préstamo (Sistema Francés)</option>
                   </select>
                 </div>
 
@@ -740,6 +939,174 @@ export default function App() {
                       <input type="number" value={studyParams.base_liquidable} onChange={(e) => handleParamChange('base_liquidable', e.target.value)} style={{ width: '100%' }} />
                     </div>
                   )}
+
+                  {selectedFormula === 'duracion_bono' && (
+                    <>
+                      <div>
+                        <label>Valor Nominal</label>
+                        <input type="number" value={studyParams.nominal} onChange={(e) => handleParamChange('nominal', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Cupón anual (%)</label>
+                        <input type="number" step="0.001" value={studyParams.cupon_anual_pct} onChange={(e) => handleParamChange('cupon_anual_pct', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Vencimiento (años)</label>
+                        <input type="number" value={studyParams.n_anos} onChange={(e) => handleParamChange('n_anos', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>TIR exigida</label>
+                        <input type="number" step="0.001" value={studyParams.tir} onChange={(e) => handleParamChange('tir', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Frecuencia cupones (al año)</label>
+                        <input type="number" step="1" value={studyParams.frecuencia} onChange={(e) => handleParamChange('frecuencia', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'tipo_forward' && (
+                    <>
+                      <div>
+                        <label>Tipo Spot 1 (s1)</label>
+                        <input type="number" step="0.001" value={studyParams.s1} onChange={(e) => handleParamChange('s1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Tipo Spot 2 (s2)</label>
+                        <input type="number" step="0.001" value={studyParams.s2} onChange={(e) => handleParamChange('s2', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Plazo inicial (t1 años)</label>
+                        <input type="number" step="0.1" value={studyParams.t1} onChange={(e) => handleParamChange('t1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Plazo final (t2 años)</label>
+                        <input type="number" step="0.1" value={studyParams.t2} onChange={(e) => handleParamChange('t2', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'tipo_cambio_forward' && (
+                    <>
+                      <div>
+                        <label>Tipo cambio Spot (S)</label>
+                        <input type="number" step="0.0001" value={studyParams.spot} onChange={(e) => handleParamChange('spot', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Tipo Doméstico (r_dom)</label>
+                        <input type="number" step="0.001" value={studyParams.r_dom} onChange={(e) => handleParamChange('r_dom', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Tipo Extranjero (r_for)</label>
+                        <input type="number" step="0.001" value={studyParams.r_for} onChange={(e) => handleParamChange('r_for', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Plazo (días)</label>
+                        <input type="number" step="1" value={studyParams.dias} onChange={(e) => handleParamChange('dias', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'ratio_informacion' && (
+                    <>
+                      <div>
+                        <label>Rp (Rentabilidad cartera)</label>
+                        <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Rb (Rentabilidad benchmark)</label>
+                        <input type="number" step="0.001" value={studyParams.rb} onChange={(e) => handleParamChange('rb', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Tracking Error</label>
+                        <input type="number" step="0.001" value={studyParams.tracking_error} onChange={(e) => handleParamChange('tracking_error', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'ratio_sortino' && (
+                    <>
+                      <div>
+                        <label>Rp (Rentabilidad cartera)</label>
+                        <input type="number" step="0.001" value={studyParams.rp} onChange={(e) => handleParamChange('rp', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Rf (Tasa libre riesgo)</label>
+                        <input type="number" step="0.001" value={studyParams.rf} onChange={(e) => handleParamChange('rf', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Downside Deviation</label>
+                        <input type="number" step="0.001" value={studyParams.downside_deviation} onChange={(e) => handleParamChange('downside_deviation', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'cartera_dos_activos' && (
+                    <>
+                      <div>
+                        <label>w1 (Ponderación A1)</label>
+                        <input type="number" step="0.01" value={studyParams.w1} onChange={(e) => handleParamChange('w1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>w2 (Ponderación A2)</label>
+                        <input type="number" step="0.01" value={studyParams.w2} onChange={(e) => handleParamChange('w2', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>r1 (Retorno A1)</label>
+                        <input type="number" step="0.001" value={studyParams.r1} onChange={(e) => handleParamChange('r1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>r2 (Retorno A2)</label>
+                        <input type="number" step="0.001" value={studyParams.r2} onChange={(e) => handleParamChange('r2', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>σ1 (Volatilidad A1)</label>
+                        <input type="number" step="0.001" value={studyParams.sigma1} onChange={(e) => handleParamChange('sigma1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>σ2 (Volatilidad A2)</label>
+                        <input type="number" step="0.001" value={studyParams.sigma2} onChange={(e) => handleParamChange('sigma2', e.target.value)} />
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label>Correlación (ρ1,2 entre -1 y 1)</label>
+                        <input type="number" step="0.01" min="-1" max="1" value={studyParams.correlacion} onChange={(e) => handleParamChange('correlacion', e.target.value)} style={{ width: '100%' }} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'valoracion_inmobiliaria' && (
+                    <>
+                      <div>
+                        <label>Renta Neta Anual (€)</label>
+                        <input type="number" value={studyParams.renta_neta} onChange={(e) => handleParamChange('renta_neta', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Cap Rate (%)</label>
+                        <input type="number" step="0.001" value={studyParams.cap_rate} onChange={(e) => handleParamChange('cap_rate', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedFormula === 'amortizacion_francesa' && (
+                    <>
+                      <div>
+                        <label>Nominal del Préstamo (€)</label>
+                        <input type="number" value={studyParams.nominal} onChange={(e) => handleParamChange('nominal', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>TIN anual del préstamo (%)</label>
+                        <input type="number" step="0.001" value={studyParams.tin} onChange={(e) => handleParamChange('tin', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Plazo (años)</label>
+                        <input type="number" step="1" value={studyParams.n_anos} onChange={(e) => handleParamChange('n_anos', e.target.value)} />
+                      </div>
+                      <div>
+                        <label>Frecuencia pagos (pagos/año)</label>
+                        <input type="number" step="1" value={studyParams.frecuencia} onChange={(e) => handleParamChange('frecuencia', e.target.value)} />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <button className="btn btn-accent" onClick={handleCalculateStudy} disabled={isSubmitting}>
@@ -833,6 +1200,102 @@ export default function App() {
                       <p style={{ fontSize: '0.9rem' }}>Más de 300.000 €: <strong>28%</strong></p>
                     </div>
                   )}
+
+                  {selectedFormula === 'duracion_bono' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Duración de Macaulay, Modificada y Convexidad:</p>
+                      <div className="math-block">
+                        {"$$D = \\frac{\\sum_{t=1}^{N} t \\cdot \\frac{C_t}{(1+y)^t}}{P}, \\quad DM = \\frac{D}{1+\\frac{y}{m}}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        La duración de Macaulay mide el tiempo medio ponderado para recibir los flujos. La Duración Modificada mide la sensibilidad del precio ante cambios en la TIR. La Convexidad mide la curvatura de la relación precio-rendimiento.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'tipo_forward' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Tipo Forward Implícito:</p>
+                      <div className="math-block">
+                        {"$$f(t_1, t_2) = \\left[ \\frac{(1+s_2)^{t_2}}{(1+s_1)^{t_1}} \\right]^{\\frac{1}{t_2 - t_1}} - 1$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Tipo de interés implícito para un periodo futuro $(t_1, t_2)$ deducido a partir de los tipos de interés spot (al contado) vigentes hoy.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'tipo_cambio_forward' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Paridad de Tipos de Interés (Divisas):</p>
+                      <div className="math-block">
+                        {"$$F = S \\cdot \\frac{1 + r_{dom} \\cdot \\frac{d}{360}}{1 + r_{for} \\cdot \\frac{d}{360}}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        {"Determina el tipo de cambio a plazo ($F$) a partir del tipo de cambio al contado ($S$) y los tipos de interés de la divisa doméstica ($r_{dom}$) y la extranjera ($r_{for}$)."}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'ratio_informacion' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Ratio de Información:</p>
+                      <div className="math-block">
+                        {"$$IR = \\frac{R_p - R_b}{\\text{Tracking Error}}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Mide el exceso de retorno de una cartera activa frente a su índice de referencia ($R_b$) por unidad de riesgo activo (Tracking Error).
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'ratio_sortino' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Ratio de Sortino:</p>
+                      <div className="math-block">
+                        {"$$Sortino = \\frac{R_p - R_f}{\\sigma_{downside}}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Similar a Sharpe, pero en el denominador utiliza solo la desviación típica de las rentabilidades negativas (downside deviation), penalizando solo la volatilidad adversa.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'cartera_dos_activos' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Retorno y Riesgo de Cartera de Dos Activos:</p>
+                      <div className="math-block">
+                        {"$$E(R_p) = w_1 R_1 + w_2 R_2, \\quad \\sigma_p = \\sqrt{w_1^2\\sigma_1^2 + w_2^2\\sigma_2^2 + 2w_1 w_2\\rho_{1,2}\\sigma_1\\sigma_2}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        {"Muestra el efecto de diversificación. A menor correlación ($\\rho_{1,2}$), menor volatilidad global de la cartera."}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'valoracion_inmobiliaria' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Capitalización de Rentas Inmobiliarias:</p>
+                      <div className="math-block">
+                        {"$$\\text{Valor} = \\frac{\\text{Renta Neta Anual}}{\\text{Cap Rate}}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Método estándar para estimar el valor comercial de un inmueble en función de las rentas netas que es capaz de generar anualmente.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFormula === 'amortizacion_francesa' && (
+                    <div>
+                      <p style={{ marginBottom: '12px' }}>Sistema de Amortización Francés (Cuota Constante):</p>
+                      <div className="math-block">
+                        {"$$\\text{Cuota} = N \\cdot \\frac{i}{1 - (1+i)^{-p}}$$"}
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        Calcula el pago periódico constante ($Cuota$) de un préstamo con principal ($N$), tipo de interés periódico ($i$) y número de pagos ($p$).
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {studyResult && (
@@ -856,11 +1319,55 @@ export default function App() {
                       </div>
                     )}
 
-                    {['sharpe', 'treynor', 'jensen', 'tae', 'precio_bono'].includes(selectedFormula) && (
+                    {selectedFormula === 'sharpe' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Ratio de Sharpe: <strong>{studyResult.result.toFixed(4)}</strong></p>
+                    )}
+                    {selectedFormula === 'treynor' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Ratio de Treynor: <strong>{studyResult.result.toFixed(4)}</strong></p>
+                    )}
+                    {selectedFormula === 'jensen' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Alfa de Jensen: <strong>{(studyResult.result * 100).toFixed(4)}%</strong></p>
+                    )}
+                    {selectedFormula === 'tae' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>TAE equivalente: <strong>{(studyResult.result * 100).toFixed(4)}%</strong></p>
+                    )}
+                    {selectedFormula === 'precio_bono' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Precio del Bono: <strong>{studyResult.result.toFixed(2)} €</strong></p>
+                    )}
+                    {selectedFormula === 'duracion_bono' && (
                       <div>
-                        <p style={{ color: '#fff', fontSize: '1.3rem' }}>
-                          Valor: <strong>{typeof studyResult.result === 'number' ? (Math.round(studyResult.result * 100000) / 100000).toLocaleString() : JSON.stringify(studyResult)}</strong>
-                        </p>
+                        <p style={{ color: '#fff', marginBottom: '4px' }}>Precio del Bono: <strong>{studyResult.precio.toFixed(2)} €</strong></p>
+                        <p style={{ color: '#fff', marginBottom: '4px' }}>Duración de Macaulay: <strong>{studyResult.macaulay.toFixed(4)} años</strong></p>
+                        <p style={{ color: '#fff', marginBottom: '4px' }}>Duración Modificada: <strong>{(studyResult.modificada * 100).toFixed(4)}%</strong></p>
+                        <p style={{ color: '#fff' }}>Convexidad: <strong>{studyResult.convexidad.toFixed(4)}</strong></p>
+                      </div>
+                    )}
+                    {selectedFormula === 'tipo_forward' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Tipo Forward f(t1, t2): <strong>{(studyResult.result * 100).toFixed(4)}%</strong></p>
+                    )}
+                    {selectedFormula === 'tipo_cambio_forward' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Tipo de Cambio Forward: <strong>{studyResult.result.toFixed(6)}</strong></p>
+                    )}
+                    {selectedFormula === 'ratio_informacion' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Ratio de Información: <strong>{studyResult.result.toFixed(4)}</strong></p>
+                    )}
+                    {selectedFormula === 'ratio_sortino' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Ratio de Sortino: <strong>{studyResult.result.toFixed(4)}</strong></p>
+                    )}
+                    {selectedFormula === 'cartera_dos_activos' && (
+                      <div>
+                        <p style={{ color: '#fff', marginBottom: '4px' }}>Retorno esperado de cartera: <strong>{(studyResult.retorno_cartera * 100).toFixed(4)}%</strong></p>
+                        <p style={{ color: '#fff' }}>Volatilidad de la cartera: <strong>{(studyResult.volatilidad_cartera * 100).toFixed(4)}%</strong></p>
+                      </div>
+                    )}
+                    {selectedFormula === 'valoracion_inmobiliaria' && (
+                      <p style={{ color: '#fff', fontSize: '1.2rem' }}>Valor estimado del inmueble: <strong>{studyResult.result.toFixed(2)} €</strong></p>
+                    )}
+                    {selectedFormula === 'amortizacion_francesa' && (
+                      <div>
+                        <p style={{ color: '#fff', marginBottom: '4px' }}>Cuota periódica: <strong>{studyResult.cuota_periodica.toFixed(2)} €</strong></p>
+                        <p style={{ color: '#fff', marginBottom: '4px' }}>Total intereses pagados: <strong>{studyResult.total_intereses.toFixed(2)} €</strong></p>
+                        <p style={{ color: '#fff' }}>Total pagado (Principal + Intereses): <strong>{studyResult.total_pagado.toFixed(2)} €</strong></p>
                       </div>
                     )}
                   </div>
@@ -875,7 +1382,7 @@ export default function App() {
             /* APUNTES TEÓRICOS */
             <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
               {/* Selector de módulo */}
-              <aside className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <aside className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '24px' }}>
                 <h4 style={{ marginBottom: '12px', fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>Módulos del Temario</h4>
                 {Array.from({ length: 10 }).map((_, idx) => {
                   const mId = `M${idx + 1}`;
@@ -909,18 +1416,12 @@ export default function App() {
               </aside>
 
               {/* Visualizador de apuntes */}
-              <main className="card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
-                  <div dangerouslySetInnerHTML={{ __html: apuntesContent 
-                    .replace(/### (.*)/g, '<h3 style="font-size: 1.5rem; color: #fff; margin-bottom: 16px; border-left: 4px solid var(--primary); padding-left: 12px;">$1</h3>')
-                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                    .replace(/- (.*)/g, '<li style="margin-left: 20px; margin-bottom: 8px;">$1</li>')
-                    .replace(/\n\n/g, '<br/>')
-                    .replace(/\n/g, '<br/>') 
-                  }} />
+              <main className="card" style={{ height: 'calc(100vh - 220px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem', overflowY: 'auto', flex: 1, paddingRight: '8px', marginBottom: '16px' }}>
+                  <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(apuntesContent) }} />
                 </div>
                 
-                <button className="btn btn-secondary" style={{ width: 'fit-content', marginTop: '32px' }} onClick={() => setScreen('DASHBOARD')}>
+                <button className="btn btn-secondary" style={{ width: 'fit-content' }} onClick={() => setScreen('DASHBOARD')}>
                   Volver al Dashboard
                 </button>
               </main>

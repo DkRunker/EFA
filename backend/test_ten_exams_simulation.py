@@ -67,7 +67,7 @@ def test_student_lifecycle_with_ten_exams():
     ]
     
     intentos_aprobados = 0
-    from backend.database import PREGUNTAS_TEST
+    from backend.database import PREGUNTAS_TEST, PREGUNTAS_PRACTICAS
 
     for i, tipo in enumerate(tipos_examen, 1):
         print(f"\n--- Examen #{i} / 10 ({tipo}) ---")
@@ -98,26 +98,15 @@ def test_student_lifecycle_with_ten_exams():
         if session_data["pregunta_practica"]:
             id_prac = session_data["pregunta_practica"]["id"]
             if es_estudioso_en_este:
-                if id_prac == 1001:
-                    respuestas_practica[str(id_prac)] = (
-                        "Para resolver Gordon-Shapiro, calculamos el denominador ke - g = 0.12 - 0.08 = 0.04. "
-                        "El precio teórico P0 inicial es 4.00 / 0.04 = 100.00 €. Si g sube al 9.0% (0.09), "
-                        "el precio teórico es de 4.00 / 0.03 = 133.33 €. La tasa de crecimiento de dividendos tiene "
-                        "una relación directa y aumenta el precio."
-                    )
-                elif id_prac == 1002:
-                    respuestas_practica[str(id_prac)] = (
-                        "El Ratio de Sharpe es de 1.50, calculado como (0.15 - 0.03) / 0.08 = 1.50. "
-                        "El Ratio de Treynor es de 0.10 (10%), calculado como (0.15 - 0.03) / 1.2. "
-                        "El Ratio de Sharpe mide el riesgo total (volatilidad), mientras que Treynor mide el riesgo sistemático (Beta). "
-                        "Si la cartera no está bien diversificada, puede penalizar en Sharpe pero verse aceptable en Treynor."
-                    )
-                elif id_prac == 1003:
-                    respuestas_practica[str(id_prac)] = (
-                        "La cuota tributaria en el IRPF del ahorro se calcula por tramos: Tramo 1 (hasta 6.000 €) al 19% = 1.140 €. "
-                        "Tramo 2 (hasta 50.000 €) al 21% por 44.000 € = 9.240 €. Tramo 3 (de 50.000 a 70.000 €) al 23% por 20.000 € = 4.600 €. "
-                        "La cuota total del ahorro en el IRPF es de 1.140 + 9.240 + 4.600 = 14980.0 €."
-                    )
+                # El alumno estudioso resuelve CUALQUIER caso práctico del banco: reproduce
+                # el razonamiento correcto (explicación), el valor numérico exacto en formato
+                # simple y todos los términos clave de la rúbrica. Construcción genérica para
+                # que el test siga siendo válido al ampliar el banco de prácticas.
+                prac = next(p for p in PREGUNTAS_PRACTICAS if p.id == id_prac)
+                partes = [prac.explicacion, " ".join(prac.palabras_clave)]
+                if prac.valor_esperado is not None:
+                    partes.append(f"El resultado obtenido es {prac.valor_esperado}.")
+                respuestas_practica[str(id_prac)] = " ".join(partes)
             else:
                 respuestas_practica[str(id_prac)] = "No tengo conocimientos suficientes para resolver este caso práctico."
 

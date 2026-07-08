@@ -1,0 +1,18 @@
+# Artefactos de empaquetado PyInstaller (se regeneran con Crear_ejecutable.bat)
+/build/
+/dist/
+*.spec
+
+# Entornos y cachés de Python
+.venv/
+venv/
+.efa_venv/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+
+# Configuración local sensible
+backend/.env
+
+# Scratch / temporales
+*.log

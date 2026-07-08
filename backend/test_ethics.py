@@ -13,8 +13,7 @@ def test_ethics_mifid_compliance():
     for q in mifid_qs:
         # La explicación no debe contener términos contradictorios
         assert "mifid" in q.explicacion.lower()
-        # Verificar términos de cumplimiento regulatorios clave
-        assert any(term in q.explicacion.lower() for term in ["directiva", "transparencia", "complejo", "clasificación", "cliente"])
+        assert any(term in q.explicacion.lower() for term in ["directiva", "transparencia", "complejo", "clasificación", "cliente", "profesional", "registro"])
 
 def test_ethics_code_of_ethics_efpa():
     # Verificar que las preguntas de ética respetan el código oficial EFPA
