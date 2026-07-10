@@ -43,7 +43,17 @@ function renderMarkdownToHtml(markdown: string): string {
     return mathToken(idx);
   });
 
+  // 2b. Ocultar conceptos con definición: [[término::definición]]
+  const conceptos: { term: string; def: string }[] = [];
+  const conceptToken = (idx: number) => `CONCEPTTKN${idx}CONCEPTEND`;
+  processed = processed.replace(/\[\[([^\]|]+?)::([^\]]+?)\]\]/g, (_m, term, def) => {
+    const idx = conceptos.length;
+    conceptos.push({ term: String(term).trim(), def: String(def).trim() });
+    return conceptToken(idx);
+  });
+
   const lines = processed.split('\n');
+  let headingCounter = 0;
   const htmlBlocks: string[] = [];
   
   let inList: 'ul' | 'ol' | null = null;
@@ -123,15 +133,16 @@ function renderMarkdownToHtml(markdown: string): string {
       flushParagraph();
       const level = headerMatch[1].length;
       const headerText = renderInlineMarkdown(headerMatch[2].replace(/\s+#+$/, ''));
-      
-      let style = 'margin-top: 24px; margin-bottom: 12px; font-weight: 600; color: #fff;';
+      const headingId = `sec-${headingCounter++}`;
+
+      let style = 'margin-top: 24px; margin-bottom: 12px; font-weight: 600; color: #fff; scroll-margin-top: 24px;';
       if (level === 1) style += 'font-size: 1.8rem; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;';
       else if (level === 2) style += 'font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;';
       else if (level === 3) style += 'font-size: 1.35rem; border-left: 4px solid var(--primary); padding-left: 12px; margin-bottom: 16px;';
       else if (level === 4) style += 'font-size: 1.2rem; border-left: 3px solid var(--secondary); padding-left: 8px;';
       else style += 'font-size: 1.05rem;';
 
-      htmlBlocks.push(`<h${level} style="${style}">${headerText}</h${level}>`);
+      htmlBlocks.push(`<h${level} id="${headingId}" style="${style}">${headerText}</h${level}>`);
       continue;
     }
 
@@ -183,13 +194,54 @@ function renderMarkdownToHtml(markdown: string): string {
   flushList();
   flushParagraph();
 
-  // 9. Restaurar las fórmulas matemáticas originales en el HTML
+  // 9. Restaurar las fórmulas matemáticas originales en el HTML.
+  // IMPORTANTE: se usa una FUNCIÓN de reemplazo para que las secuencias "$$"
+  // de las fórmulas no se interpreten como patrones especiales de String.replace
+  // (que colapsarían "$$" en un solo "$" y romperían las fórmulas de bloque).
   let finalHtml = htmlBlocks.join('\n');
   for (let i = 0; i < mathPlaceholders.length; i++) {
-    finalHtml = finalHtml.replaceAll(`MATHTKN${i}MATHEND`, mathPlaceholders[i]);
+    finalHtml = finalHtml.replaceAll(`MATHTKN${i}MATHEND`, () => mathPlaceholders[i]);
+  }
+
+  // 10. Restaurar los conceptos como elementos interactivos (tooltip + acordeón por clic)
+  const escaparHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  for (let i = 0; i < conceptos.length; i++) {
+    const { term, def } = conceptos[i];
+    const span = `<span class="concepto" tabindex="0" role="button">${escaparHtml(term)}<span class="concepto-tip">${escaparHtml(def)}</span></span>`;
+    finalHtml = finalHtml.replaceAll(`CONCEPTTKN${i}CONCEPTEND`, () => span);
   }
 
   return finalHtml;
+}
+
+// Extrae las secciones (encabezados) de los apuntes para el submenú lateral.
+// Prefiere el nivel de sección "##"; si no existe, usa "####" (formato antiguo)
+// o "###". El id de cada sección se corresponde con el asignado en el render.
+function extractSecciones(markdown: string): { id: string; title: string }[] {
+  if (!markdown) return [];
+  const limpiarTitulo = (t: string) =>
+    t
+      .replace(/\[\[([^\]|]+?)::[^\]]+?\]\]/g, '$1')
+      .replace(/\$\$?[^$]*?\$\$?/g, '')
+      .replace(/[*_`#]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const headings: { level: number; title: string; idx: number }[] = [];
+  const lines = markdown.split('\n');
+  let idx = 0;
+  for (const line of lines) {
+    const m = line.trim().match(/^(#{1,6})\s+(.*)$/);
+    if (m) {
+      headings.push({ level: m[1].length, title: limpiarTitulo(m[2]), idx });
+      idx++;
+    }
+  }
+  const niveles = new Set(headings.map((h) => h.level));
+  const target = niveles.has(2) ? 2 : niveles.has(4) ? 4 : niveles.has(3) ? 3 : 0;
+  return headings
+    .filter((h) => h.level === target && h.title.length > 0)
+    .map((h) => ({ id: `sec-${h.idx}`, title: h.title }));
 }
 
 export default function App() {
@@ -284,6 +336,12 @@ export default function App() {
         });
     }
   }, [screen, studySubTab, selectedApunteModulo]);
+
+  // Secciones del módulo actual (para el submenú lateral) y navegación por scroll
+  const seccionesApuntes = extractSecciones(apuntesContent);
+  const irASeccion = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Temporizador de Examen
   useEffect(() => {
@@ -1386,43 +1444,54 @@ export default function App() {
           ) : (
             /* APUNTES TEÓRICOS */
             <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
-              {/* Selector de módulo */}
-              <aside className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '24px' }}>
+              {/* Selector de módulo con submenú de secciones */}
+              <aside className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px', position: 'sticky', top: '24px', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' }}>
                 <h4 style={{ marginBottom: '12px', fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>Módulos del Temario</h4>
                 {Array.from({ length: 10 }).map((_, idx) => {
                   const mId = `M${idx + 1}`;
                   const activo = selectedApunteModulo === mId;
                   return (
-                    <button
-                      key={mId}
-                      onClick={() => setSelectedApunteModulo(mId)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        width: '100%',
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        border: activo ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
-                        background: activo ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255,255,255,0.02)',
-                        color: activo ? '#fff' : 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontSize: '0.95rem',
-                        fontWeight: activo ? 600 : 400,
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <span>Tema {idx + 1} ({mId})</span>
-                      <span style={{ fontSize: '0.8rem', opacity: activo ? 1 : 0.4 }}>→</span>
-                    </button>
+                    <div key={mId}>
+                      <button
+                        onClick={() => setSelectedApunteModulo(mId)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          border: activo ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
+                          background: activo ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255,255,255,0.02)',
+                          color: activo ? '#fff' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          fontSize: '0.95rem',
+                          fontWeight: activo ? 600 : 400,
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>Tema {idx + 1} ({mId})</span>
+                        <span style={{ fontSize: '0.8rem', opacity: activo ? 1 : 0.4 }}>{activo ? '▾' : '→'}</span>
+                      </button>
+                      {activo && seccionesApuntes.length > 0 && (
+                        <ul className="seccion-nav">
+                          {seccionesApuntes.map((sec) => (
+                            <li key={sec.id}>
+                              <button onClick={() => irASeccion(sec.id)}>{sec.title}</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   );
                 })}
               </aside>
 
               {/* Visualizador de apuntes: el panel crece con el contenido y la
-                  página hace scroll de forma natural (la barra lateral es sticky). */}
-              <main className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  página hace scroll de forma natural (la barra lateral es sticky).
+                  card-static evita el efecto de desplazamiento al pasar el ratón. */}
+              <main className="card card-static" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
                   <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(apuntesContent) }} />
                 </div>

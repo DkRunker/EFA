@@ -78,7 +78,75 @@ select option:hover {
 .card:hover {
   border-color: rgba(138, 43, 226, 0.3);
   box-shadow: var(--shadow-lg), 0 0 20px rgba(138, 43, 226, 0.1);
-  transform: translateY(-2px);
+}
+
+/* La caja de contenido de la teoría no debe reaccionar al pasar el ratón
+   (evita el molesto desplazamiento y cambios de sombra al navegar). */
+.card.card-static:hover {
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-md);
+}
+
+/* Conceptos con definición: tooltip al pasar el ratón y acordeón al hacer clic
+   (el foco por clic mantiene visible la definición). Pensado para principiantes. */
+.concepto {
+  position: relative;
+  border-bottom: 1px dashed var(--secondary);
+  color: var(--secondary);
+  cursor: help;
+  font-weight: 500;
+}
+.concepto:focus { outline: none; }
+.concepto-tip {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 1.7em;
+  z-index: 30;
+  width: max-content;
+  max-width: 340px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--secondary);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  font-weight: 400;
+  white-space: normal;
+}
+.concepto:hover .concepto-tip,
+.concepto:focus .concepto-tip,
+.concepto:focus-within .concepto-tip {
+  display: block;
+}
+
+/* Submenú de secciones del módulo en la barra lateral de la teoría */
+.seccion-nav {
+  list-style: none;
+  margin: 4px 0 10px 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.seccion-nav button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.seccion-nav button:hover {
+  color: #fff;
+  background: rgba(0, 229, 255, 0.08);
 }
 
 /* Typography styles */
