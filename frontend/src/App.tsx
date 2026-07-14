@@ -60,6 +60,8 @@ function renderMarkdownToHtml(markdown: string): string {
   let inList: 'ul' | 'ol' | null = null;
   let currentListItemLines: string[] = [];
   let paragraphLines: string[] = [];
+  let calloutTipo: string | null = null;
+  let calloutLines: string[] = [];
 
   const flushParagraph = () => {
     if (paragraphLines.length > 0) {
@@ -112,6 +114,28 @@ function renderMarkdownToHtml(markdown: string): string {
     const line = lines[i];
     const trimmed = line.trim();
 
+    // 2c. Callouts intercalados: :::ejemplo / :::error ... :::
+    if (trimmed === ':::ejemplo' || trimmed === ':::error') {
+      flushList();
+      flushParagraph();
+      calloutTipo = trimmed.slice(3);
+      calloutLines = [];
+      continue;
+    }
+    if (trimmed === ':::' && calloutTipo) {
+      const titulo = calloutTipo === 'ejemplo' ? '📝 Ejemplo resuelto' : '⚠️ Error frecuente';
+      const innerHtml = renderMarkdownToHtml(calloutLines.join('\n'));
+      htmlBlocks.push(
+        `<div class="callout callout-${calloutTipo}"><div class="callout-titulo">${titulo}</div>${innerHtml}</div>`
+      );
+      calloutTipo = null;
+      continue;
+    }
+    if (calloutTipo) {
+      calloutLines.push(line);
+      continue;
+    }
+
     // 3. Caso especial: Fórmulas en bloque que están solas en su línea
     if (trimmed.startsWith('MATHTKN') && trimmed.endsWith('MATHEND')) {
       const match = trimmed.match(/^MATHTKN(\d+)MATHEND$/);
@@ -134,7 +158,7 @@ function renderMarkdownToHtml(markdown: string): string {
       flushParagraph();
       const level = headerMatch[1].length;
       const headerText = renderInlineMarkdown(headerMatch[2].replace(/\s+#+$/, ''));
-      const headingId = `sec-${headingCounter++}`;
+      const headingId = `hb-${headingCounter++}`;
 
       let style = 'margin-top: 24px; margin-bottom: 12px; font-weight: 600; color: #fff; scroll-margin-top: 24px;';
       if (level === 1) style += 'font-size: 1.8rem; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;';
@@ -216,33 +240,111 @@ function renderMarkdownToHtml(markdown: string): string {
   return finalHtml;
 }
 
-// Extrae las secciones (encabezados) de los apuntes para el submenú lateral.
-// Prefiere el nivel de sección "##"; si no existe, usa "####" (formato antiguo)
-// o "###". El id de cada sección se corresponde con el asignado en el render.
-function extractSecciones(markdown: string): { id: string; title: string }[] {
-  if (!markdown) return [];
-  const limpiarTitulo = (t: string) =>
-    t
-      .replace(/\[\[([^\]|]+?)::[^\]]+?\]\]/g, '$1')
-      .replace(/\$\$?[^$]*?\$\$?/g, '')
-      .replace(/[*_`#]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  const headings: { level: number; title: string; idx: number }[] = [];
-  const lines = markdown.split('\n');
-  let idx = 0;
-  for (const line of lines) {
-    const m = line.trim().match(/^(#{1,6})\s+(.*)$/);
-    if (m) {
-      headings.push({ level: m[1].length, title: limpiarTitulo(m[2]), idx });
-      idx++;
+// Limpia un título de sección para mostrarlo en el submenú (sin marcas markdown).
+function limpiarTitulo(t: string): string {
+  return t
+    .replace(/\[\[([^\]|]+?)::[^\]]+?\]\]/g, '$1')
+    .replace(/\[\[sim:[a-z0-9_]+\]\]/g, '')
+    .replace(/\$\$?[^$]*?\$\$?/g, '')
+    .replace(/[*_`#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Tipos de la teoría estructurada por secciones.
+interface Ejercicio {
+  enunciado: string;
+  tipo?: 'numerico' | 'opcion';
+  formula?: string;
+  valor_esperado?: number;
+  tolerancia?: number;
+  opciones?: string[];
+  correcta?: number;
+  explicacion: string;
+}
+interface Seccion {
+  titulo: string;
+  cuerpo: string;
+  ejercicios: Ejercicio[];
+}
+
+// Renderiza el cuerpo de una sección troceándolo en los marcadores [[sim:clave]],
+// intercalando bloques de markdown con el simulador de la fórmula correspondiente.
+function SeccionCuerpo({ cuerpo }: { cuerpo: string }) {
+  const partes = cuerpo.split(/\[\[sim:([a-z0-9_]+)\]\]/);
+  return (
+    <>
+      {partes.map((parte, i) => {
+        if (i % 2 === 1) {
+          // clave de fórmula capturada
+          return FORMULAS[parte] ? <FormulaSimulator key={i} formula={parte} compact /> : null;
+        }
+        if (!parte.trim()) return null;
+        return <div key={i} dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(parte) }} />;
+      })}
+    </>
+  );
+}
+
+// Widget interactivo de un ejercicio: el alumno responde, comprueba y ve la
+// solución correcta con la explicación del proceso.
+function EjercicioWidget({ ej, n }: { ej: Ejercicio; n: number }) {
+  const [valor, setValor] = useState('');
+  const [seleccion, setSeleccion] = useState<number | null>(null);
+  const [revelado, setRevelado] = useState(false);
+  const esNumerico = ej.tipo !== 'opcion';
+
+  let acierto = false;
+  if (revelado) {
+    if (esNumerico) {
+      const num = parseFloat(String(valor).replace(',', '.'));
+      acierto = !isNaN(num) && Math.abs(num - (ej.valor_esperado ?? NaN)) <= (ej.tolerancia ?? 0.01);
+    } else {
+      acierto = seleccion === ej.correcta;
     }
   }
-  const niveles = new Set(headings.map((h) => h.level));
-  const target = niveles.has(2) ? 2 : niveles.has(4) ? 4 : niveles.has(3) ? 3 : 0;
-  return headings
-    .filter((h) => h.level === target && h.title.length > 0)
-    .map((h) => ({ id: `sec-${h.idx}`, title: h.title }));
+  const solucionTexto = esNumerico
+    ? String(ej.valor_esperado)
+    : (ej.opciones && ej.correcta != null ? ej.opciones[ej.correcta] : '');
+
+  return (
+    <div className="ejercicio">
+      <div className="ejercicio-enunciado">
+        <strong>Ejercicio {n}. </strong>
+        <span dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(ej.enunciado) }} />
+      </div>
+      {esNumerico ? (
+        <input
+          type="text"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          placeholder="Escribe tu resultado"
+          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', color: '#fff' }}
+        />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {(ej.opciones ?? []).map((op, i) => (
+            <label key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text-primary)', cursor: 'pointer' }}>
+              <input type="radio" name={`ej-${n}`} checked={seleccion === i} onChange={() => setSeleccion(i)} />
+              <span>{op}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      <button className="btn btn-secondary" style={{ marginTop: '10px', width: 'fit-content' }} onClick={() => setRevelado(true)}>
+        Comprobar
+      </button>
+      {revelado && (
+        <div className="ejercicio-solucion">
+          <div className={acierto ? 'ejercicio-ok' : 'ejercicio-ko'}>
+            {acierto ? '✓ ¡Correcto!' : '✗ Revisa la solución'}
+          </div>
+          <div style={{ marginTop: '4px' }}><strong>Solución:</strong> {solucionTexto}</div>
+          <div style={{ marginTop: '6px' }} dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(ej.explicacion) }} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function App() {
@@ -276,7 +378,7 @@ export default function App() {
   // Nuevas variables para apuntes de estudio
   const [studySubTab, setStudySubTab] = useState<'SANDBOX' | 'APUNTES'>('SANDBOX');
   const [selectedApunteModulo, setSelectedApunteModulo] = useState<string>('M1');
-  const [apuntesContent, setApuntesContent] = useState<string>('');
+  const [seccionesData, setSeccionesData] = useState<{ intro: string; secciones: Seccion[] }>({ intro: '', secciones: [] });
 
   // Historial e intentos
   const [historial, setHistorial] = useState<Array<{ usuario: string; tipo: string; nota: number; aprobado: boolean; fecha: string }>>(() => {
@@ -303,19 +405,19 @@ export default function App() {
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, apuntesContent]);
+  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, seccionesData]);
 
-  // Efecto para cargar apuntes teóricos
+  // Efecto para cargar la teoría estructurada por secciones
   useEffect(() => {
     if (screen === 'STUDY' && studySubTab === 'APUNTES') {
       setErrorMsg('');
-      fetch(`http://localhost:8000/api/study/apuntes/${selectedApunteModulo}`)
+      fetch(`http://localhost:8000/api/study/secciones/${selectedApunteModulo}`)
         .then(res => {
-          if (!res.ok) throw new Error('No se pudieron cargar los apuntes.');
+          if (!res.ok) throw new Error('No se pudo cargar la teoría.');
           return res.json();
         })
         .then(data => {
-          setApuntesContent(data.apuntes);
+          setSeccionesData({ intro: data.intro, secciones: data.secciones });
         })
         .catch(err => {
           setErrorMsg(err.message || 'Error de conexión');
@@ -324,7 +426,7 @@ export default function App() {
   }, [screen, studySubTab, selectedApunteModulo]);
 
   // Secciones del módulo actual (para el submenú lateral) y navegación por scroll
-  const seccionesApuntes = extractSecciones(apuntesContent);
+  const seccionesApuntes = seccionesData.secciones.map((s, i) => ({ id: `sec-${i}`, title: limpiarTitulo(s.titulo) }));
   const irASeccion = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -840,7 +942,27 @@ export default function App() {
                   card-static evita el efecto de desplazamiento al pasar el ratón. */}
               <main className="card card-static" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
-                  <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(apuntesContent) }} />
+                  {/* Introducción del módulo */}
+                  {seccionesData.intro && (
+                    <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(seccionesData.intro) }} />
+                  )}
+                  {/* Secciones: título con id (para el submenú), cuerpo con simuladores en línea y ejercicios */}
+                  {seccionesData.secciones.map((sec, i) => (
+                    <section key={i} style={{ marginTop: '8px' }}>
+                      <h2 id={`sec-${i}`} style={{ marginTop: '24px', marginBottom: '12px', fontWeight: 600, color: '#fff', fontSize: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', scrollMarginTop: '24px' }}>
+                        {limpiarTitulo(sec.titulo)}
+                      </h2>
+                      <SeccionCuerpo cuerpo={sec.cuerpo} />
+                      {sec.ejercicios && sec.ejercicios.length > 0 && (
+                        <div style={{ marginTop: '16px' }}>
+                          <h4 style={{ fontSize: '1.1rem', color: 'var(--secondary)', marginBottom: '8px' }}>✍️ Practica lo aprendido</h4>
+                          {sec.ejercicios.map((ej, j) => (
+                            <EjercicioWidget key={j} ej={ej} n={j + 1} />
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ))}
                 </div>
 
                 <button className="btn btn-secondary" style={{ width: 'fit-content' }} onClick={() => setScreen('DASHBOARD')}>

@@ -71,8 +71,23 @@ PREGUNTAS_PRACTICAS: list[PreguntaPractica] = [
     PreguntaPractica(**p) for p in practicas.PRACTICAS
 ]
 
-# Apuntes teóricos por módulo.
-APUNTES_TEORICOS: dict[str, str] = {code: mod.APUNTES for code, mod in _MODULOS}
+# Teoría estructurada por secciones (INTRO + SECCIONES) de cada módulo.
+# Cada sección: {"titulo", "cuerpo", "ejercicios": [...]}.
+SECCIONES_TEORICAS: dict[str, dict] = {
+    code: {"intro": mod.INTRO, "secciones": mod.SECCIONES} for code, mod in _MODULOS
+}
+
+
+def _ensamblar_apuntes(mod) -> str:
+    """Reconstruye el markdown completo (compatibilidad) desde INTRO + SECCIONES."""
+    partes = [mod.INTRO]
+    for s in mod.SECCIONES:
+        partes.append(f"## {s['titulo']}\n\n{s['cuerpo']}")
+    return "\n\n".join(partes)
+
+
+# Apuntes teóricos por módulo (derivados de la estructura por secciones).
+APUNTES_TEORICOS: dict[str, str] = {code: _ensamblar_apuntes(mod) for code, mod in _MODULOS}
 
 
 def obtener_preguntas_test():

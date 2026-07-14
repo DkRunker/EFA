@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Any
 
-from backend.database import generar_examen, PREGUNTAS_TEST, PREGUNTAS_PRACTICAS, APUNTES_TEORICOS
+from backend.database import generar_examen, PREGUNTAS_TEST, PREGUNTAS_PRACTICAS, APUNTES_TEORICOS, SECCIONES_TEORICAS
 from backend.evaluator import evaluar_respuesta_desarrollo
 from backend.formulas import (
     calcular_gordon_shapiro,
@@ -260,6 +260,18 @@ def api_get_apunte_modulo(modulo_id: str):
             detail=f"Apuntes para el módulo {modulo_id} no encontrados."
         )
     return {"modulo": modulo_id, "apuntes": APUNTES_TEORICOS[modulo_id]}
+
+
+@app.get("/api/study/secciones/{modulo_id}")
+def api_get_secciones_modulo(modulo_id: str):
+    """Teoría estructurada por secciones (intro + secciones con cuerpo y ejercicios)."""
+    if modulo_id not in SECCIONES_TEORICAS:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Secciones para el módulo {modulo_id} no encontradas."
+        )
+    data = SECCIONES_TEORICAS[modulo_id]
+    return {"modulo": modulo_id, "intro": data["intro"], "secciones": data["secciones"]}
 
 
 # --- Servido del frontend compilado (modo portable) ---
