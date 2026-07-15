@@ -136,6 +136,35 @@ function renderMarkdownToHtml(markdown: string): string {
       continue;
     }
 
+    // 2d. Tablas markdown: fila de cabecera "| a | b |" seguida de separador "| --- | --- |"
+    if (
+      trimmed.startsWith('|') && trimmed.endsWith('|') &&
+      i + 1 < lines.length && /^\|[\s:|-]+\|$/.test(lines[i + 1].trim())
+    ) {
+      flushList();
+      flushParagraph();
+      const parseRow = (l: string) =>
+        l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((celda) => renderInlineMarkdown(celda.trim()));
+      const cabecera = parseRow(trimmed);
+      let j = i + 2;
+      const filas: string[][] = [];
+      while (j < lines.length && lines[j].trim().startsWith('|') && lines[j].trim().endsWith('|')) {
+        filas.push(parseRow(lines[j]));
+        j++;
+      }
+      const th = 'border:1px solid var(--border-color);padding:8px 11px;text-align:left;color:#fff;background:rgba(255,255,255,0.05);';
+      const td = 'border:1px solid var(--border-color);padding:8px 11px;color:var(--text-primary);vertical-align:top;';
+      let tabla = '<div style="overflow-x:auto;margin:12px 0;"><table style="border-collapse:collapse;width:100%;font-size:0.95rem;">';
+      tabla += '<thead><tr>' + cabecera.map((h) => `<th style="${th}">${h}</th>`).join('') + '</tr></thead><tbody>';
+      for (const fila of filas) {
+        tabla += '<tr>' + fila.map((c) => `<td style="${td}">${c}</td>`).join('') + '</tr>';
+      }
+      tabla += '</tbody></table></div>';
+      htmlBlocks.push(tabla);
+      i = j - 1;
+      continue;
+    }
+
     // 3. Caso especial: Fórmulas en bloque que están solas en su línea
     if (trimmed.startsWith('MATHTKN') && trimmed.endsWith('MATHEND')) {
       const match = trimmed.match(/^MATHTKN(\d+)MATHEND$/);
