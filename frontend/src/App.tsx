@@ -136,6 +136,24 @@ function renderMarkdownToHtml(markdown: string): string {
       continue;
     }
 
+    // 2c-bis. Citas markdown: bloques de líneas que empiezan por "> "
+    if (/^>\s?/.test(trimmed)) {
+      flushList();
+      flushParagraph();
+      const citaLineas: string[] = [];
+      let k = i;
+      while (k < lines.length && /^>\s?/.test(lines[k].trim())) {
+        citaLineas.push(lines[k].trim().replace(/^>\s?/, ''));
+        k++;
+      }
+      const interior = renderMarkdownToHtml(citaLineas.join('\n'));
+      htmlBlocks.push(
+        `<blockquote style="border-left:4px solid var(--secondary);background:rgba(0,229,255,0.05);margin:12px 0;padding:8px 14px;border-radius:0 8px 8px 0;">${interior}</blockquote>`
+      );
+      i = k - 1;
+      continue;
+    }
+
     // 2d. Tablas markdown: fila de cabecera "| a | b |" seguida de separador "| --- | --- |"
     if (
       trimmed.startsWith('|') && trimmed.endsWith('|') &&
