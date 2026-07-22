@@ -14,5 +14,11 @@ __pycache__/
 # Configuración local sensible
 backend/.env
 
+# Datos locales de la aplicación (usuarios registrados, con sus credenciales)
+/data/
+
+# PDF de exámenes: material con derechos, no se versiona
+*.pdf
+
 # Scratch / temporales
 *.log

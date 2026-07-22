@@ -396,14 +396,19 @@ function EjercicioWidget({ ej, n }: { ej: Ejercicio; n: number }) {
 
 export default function App() {
   // Autenticación
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  // La sesión se conserva entre recargas: sin esto, al refrescar la página el
+  // usuario volvía a la pantalla de acceso aunque ya se hubiera identificado.
+  const [currentUser, setCurrentUser] = useState<string | null>(
+    () => localStorage.getItem('efa_usuario')
+  );
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authUsername, setAuthUsername] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
   const [authSuccessMsg, setAuthSuccessMsg] = useState<string>('');
 
-  // Navegación principal
-  const [screen, setScreen] = useState<'DASHBOARD' | 'SIMULATOR' | 'RESULTS' | 'STUDY'>('DASHBOARD');
+  // Navegación principal. El temario es la pantalla de entrada: es lo que más
+  // se usa a diario, y los simulacros quedan como complemento.
+  const [screen, setScreen] = useState<'DASHBOARD' | 'SIMULATOR' | 'RESULTS' | 'STUDY'>('STUDY');
   
   // Examen activo
   const [activeExam, setActiveExam] = useState<ExamenSession | null>(null);
@@ -426,7 +431,7 @@ export default function App() {
   const [selectedFormula, setSelectedFormula] = useState<string>('gordon_shapiro');
 
   // Nuevas variables para apuntes de estudio
-  const [studySubTab, setStudySubTab] = useState<'SANDBOX' | 'APUNTES'>('SANDBOX');
+  const [studySubTab, setStudySubTab] = useState<'SANDBOX' | 'APUNTES'>('APUNTES');
   const [selectedApunteModulo, setSelectedApunteModulo] = useState<string>('M1');
   const [seccionesData, setSeccionesData] = useState<{ intro: string; secciones: Seccion[] }>({ intro: '', secciones: [] });
 
@@ -536,6 +541,7 @@ export default function App() {
         setAuthPassword('');
       } else {
         setCurrentUser(data.username);
+        localStorage.setItem('efa_usuario', data.username);
         setScreen('DASHBOARD');
       }
     } catch (err: any) {
@@ -548,6 +554,7 @@ export default function App() {
   // Logout
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('efa_usuario');
     setScreen('DASHBOARD');
     setAuthUsername('');
     setAuthPassword('');
@@ -739,17 +746,44 @@ export default function App() {
             <span style={{ fontWeight: 500, color: '#fff' }}>{currentUser}</span>
           </div>
 
-          {screen !== 'DASHBOARD' && (
-            <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.9rem' }} onClick={() => setScreen('DASHBOARD')}>
-              Volver al Panel
-            </button>
-          )}
-
           <button className="btn btn-danger" style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', color: 'var(--error)' }} onClick={handleLogout}>
             <LogOut size={16} />
           </button>
         </div>
       </header>
+
+      {/* Navegación principal: el temario va primero porque es el uso habitual.
+          Se oculta mientras se está haciendo un examen para no romper la sesión. */}
+      {screen !== 'SIMULATOR' && (
+        <nav style={{ display: 'flex', gap: '8px', marginBottom: '32px', flexWrap: 'wrap' }}>
+          {([
+            { id: 'TEMARIO', etiqueta: 'Temario', icono: <BookOpen size={18} />,
+              activo: screen === 'STUDY' && studySubTab === 'APUNTES',
+              ir: () => { setScreen('STUDY'); setStudySubTab('APUNTES'); } },
+            { id: 'SIMULACROS', etiqueta: 'Simulacros', icono: <Award size={18} />,
+              activo: screen === 'DASHBOARD' || screen === 'RESULTS',
+              ir: () => setScreen('DASHBOARD') },
+            { id: 'CALCULADORAS', etiqueta: 'Calculadoras', icono: <Calculator size={18} />,
+              activo: screen === 'STUDY' && studySubTab === 'SANDBOX',
+              ir: () => { setScreen('STUDY'); setStudySubTab('SANDBOX'); } },
+          ] as const).map(t => (
+            <button
+              key={t.id}
+              onClick={t.ir}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '12px 22px', fontSize: '1rem', fontWeight: 600,
+                cursor: 'pointer', borderRadius: '10px',
+                border: t.activo ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                background: t.activo ? 'var(--primary)' : 'transparent',
+                color: t.activo ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              {t.icono} {t.etiqueta}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {errorMsg && (
         <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error)', padding: '16px', borderRadius: '12px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center', color: '#ff8a8a' }}>
@@ -793,13 +827,10 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div style={{ marginBottom: '24px' }}>
             <h2 style={{ fontSize: '1.5rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px' }}>
-              Actividades Académicas Disponibles
+              Simulacros de examen
             </h2>
-            <button className="btn btn-accent" onClick={() => setScreen('STUDY')}>
-              <Calculator size={18} /> Sandbox de Estudio
-            </button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '40px' }}>
@@ -929,24 +960,6 @@ export default function App() {
       {screen === 'STUDY' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Sub-navegación dentro de estudio */}
-          <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-            <button 
-              className={`btn ${studySubTab === 'SANDBOX' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setStudySubTab('SANDBOX')}
-              style={{ padding: '8px 16px', fontSize: '0.95rem' }}
-            >
-              <Calculator size={16} /> Calculadora Sandbox
-            </button>
-            <button 
-              className={`btn ${studySubTab === 'APUNTES' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setStudySubTab('APUNTES')}
-              style={{ padding: '8px 16px', fontSize: '0.95rem' }}
-            >
-              <BookOpen size={16} /> Temarios y Apuntes Oficiales
-            </button>
-          </div>
-
           {studySubTab === 'SANDBOX' ? (
             /* CALCULADORA SANDBOX */
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '760px' }}>
