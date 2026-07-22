@@ -40,8 +40,9 @@ ejecutable autónomo:
 
 ## 3. Cómo usar la plataforma
 
-- **Registro / Acceso**: crea un usuario (los datos se guardan solo en memoria local mientras el
-  servidor está en marcha).
+- **Registro / Acceso**: crea un usuario. Los datos se guardan de forma persistente en tu equipo
+  (la contraseña cifrada, nunca en claro), así que no tienes que volver a registrarte cada vez.
+  En la versión portable se guardan en la carpeta `datos_efa`, junto al ejecutable.
 - **Estudiar (Teoría)**: consulta los apuntes de cada módulo **M1–M10**. Incluyen explicaciones,
   fórmulas matemáticas (renderizadas con KaTeX), ejemplos resueltos paso a paso y apartados de
   “errores frecuentes / claves de examen”.

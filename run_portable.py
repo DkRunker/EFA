@@ -24,6 +24,11 @@ def _configurar_rutas():
         # Ejecutable PyInstaller: los datos se descomprimen en sys._MEIPASS.
         base = sys._MEIPASS  # type: ignore[attr-defined]
         os.environ.setdefault("EFA_FRONTEND_DIST", os.path.join(base, "frontend_dist"))
+        # Los usuarios registrados deben persistir junto al ejecutable, no en
+        # sys._MEIPASS (que es temporal y se borra al cerrar). Así la sesión
+        # sobrevive entre ejecuciones también en la versión portable.
+        dir_exe = os.path.dirname(sys.executable)
+        os.environ.setdefault("EFA_DATA_DIR", os.path.join(dir_exe, "datos_efa"))
     else:
         # Ejecución normal: aseguramos el directorio del proyecto en sys.path.
         raiz = os.path.dirname(os.path.abspath(__file__))
