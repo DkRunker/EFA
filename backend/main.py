@@ -306,5 +306,28 @@ def api_get_secciones_modulo(modulo_id: str):
 _FRONTEND_DIST = os.environ.get("EFA_FRONTEND_DIST") or os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "frontend", "dist"
 )
+class _FrontendEstatico(StaticFiles):
+    """Sirve el frontend evitando que el navegador se quede con una versión vieja.
+
+    Los ficheros de `assets/` llevan un hash en el nombre, así que pueden
+    cachearse indefinidamente: si cambian, cambia su nombre. En cambio
+    `index.html` conserva siempre el mismo nombre y es quien apunta al bundle
+    vigente; si el navegador lo cachea, sigue cargando la versión anterior de
+    la aplicación aunque el servidor ya tenga la nueva. Por eso se le exige
+    revalidar en cada carga.
+    """
+
+    async def get_response(self, path: str, scope):
+        respuesta = await super().get_response(path, scope)
+        # StaticFiles normaliza la ruta con el separador del sistema, que en
+        # Windows es la barra invertida; la unificamos antes de compararla.
+        ruta = path.replace(os.sep, "/").lstrip("/")
+        if ruta.endswith(".html") or ruta in ("", "."):
+            respuesta.headers["Cache-Control"] = "no-cache, must-revalidate"
+        elif ruta.startswith("assets/"):
+            respuesta.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return respuesta
+
+
 if os.path.isdir(_FRONTEND_DIST):
-    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
+    app.mount("/", _FrontendEstatico(directory=_FRONTEND_DIST, html=True), name="frontend")
