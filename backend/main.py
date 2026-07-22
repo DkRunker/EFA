@@ -6,7 +6,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Any
 
-from backend.database import generar_examen, PREGUNTAS_TEST, PREGUNTAS_PRACTICAS, APUNTES_TEORICOS, SECCIONES_TEORICAS
+from backend.database import (
+    generar_examen,
+    listar_examenes_oficiales,
+    PREGUNTAS_TEST,
+    PREGUNTAS_PRACTICAS,
+    APUNTES_TEORICOS,
+    SECCIONES_TEORICAS,
+)
 from backend.evaluator import evaluar_respuesta_desarrollo
 from backend.formulas import (
     calcular_gordon_shapiro,
@@ -76,6 +83,12 @@ class CalculateFormulaRequest(BaseModel):
     formula: str
     params: dict[str, Any]
 
+@app.get("/api/exams/oficiales")
+def api_listar_examenes_oficiales():
+    """Convocatorias oficiales EFPA que pueden reproducirse íntegras."""
+    return {"examenes": listar_examenes_oficiales()}
+
+
 @app.post("/api/exams/start")
 def api_start_exam(req: StartExamRequest):
     try:
@@ -141,7 +154,8 @@ def api_submit_exam(req: SubmitExamRequest):
             "respuesta_alumno": alumno_ans,
             "respuesta_correcta": correct_ans_index,
             "es_correcta": es_correcta,
-            "explicacion": original.explicacion
+            "explicacion": original.explicacion,
+            "fuente": original.fuente
         })
         
     nota_test_pct = (aciertos / total_test) * 100 if total_test > 0 else 0.0

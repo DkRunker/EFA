@@ -407,6 +407,9 @@ export default function App() {
   
   // Examen activo
   const [activeExam, setActiveExam] = useState<ExamenSession | null>(null);
+
+  // Convocatorias oficiales que pueden reproducirse íntegras
+  const [examenesOficiales, setExamenesOficiales] = useState<{ id: string; nombre: string; n_preguntas: number }[]>([]);
   const [answersTest, setAnswersTest] = useState<Record<number, number>>({});
   const [answersPrac, setAnswersPrac] = useState<Record<number, string>>({});
   
@@ -453,6 +456,14 @@ export default function App() {
       return () => clearTimeout(t);
     }
   }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, seccionesData]);
+
+  // Carga de las convocatorias oficiales disponibles (una sola vez)
+  useEffect(() => {
+    fetch('http://localhost:8000/api/exams/oficiales')
+      .then(res => (res.ok ? res.json() : { examenes: [] }))
+      .then(data => setExamenesOficiales(data.examenes || []))
+      .catch(() => setExamenesOficiales([]));
+  }, []);
 
   // Efecto para cargar la teoría estructurada por secciones
   useEffect(() => {
@@ -837,6 +848,32 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          {examenesOficiales.length > 0 && (
+            <>
+              <h2 style={{ marginBottom: '8px', fontSize: '1.5rem', borderLeft: '4px solid var(--accent, #f59e0b)', paddingLeft: '12px' }}>
+                Convocatorias oficiales
+              </h2>
+              <p style={{ marginBottom: '24px', color: 'var(--text-secondary)' }}>
+                Exámenes reales de convocatorias EFA anteriores, con sus preguntas y explicaciones originales.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', marginBottom: '40px' }}>
+                {examenesOficiales.map(ex => (
+                  <div key={ex.id} className="card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <h3 style={{ color: '#fff', fontSize: '1.05rem', marginBottom: '4px' }}>{ex.nombre}</h3>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        <BookIcon size={14} /> {ex.n_preguntas} preguntas
+                      </span>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => handleStartExam(ex.id)} disabled={isSubmitting}>
+                      <Play size={16} /> Realizar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <h2 style={{ marginBottom: '24px', fontSize: '1.5rem', borderLeft: '4px solid var(--secondary)', paddingLeft: '12px' }}>
             Tus Intentos Recientes
@@ -1346,6 +1383,11 @@ export default function App() {
                   <p style={{ color: 'var(--text-primary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
                     {item.explicacion}
                   </p>
+                  {item.fuente && item.fuente !== 'Banco propio' && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '10px', fontStyle: 'italic' }}>
+                      Fuente: {item.fuente}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

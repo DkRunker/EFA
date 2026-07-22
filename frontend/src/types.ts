@@ -30,6 +30,8 @@ export interface DesgloseTestItem {
   respuesta_correcta: number;
   es_correcta: boolean;
   explicacion: string;
+  /** Procedencia: "Banco propio" o el examen oficial del que se importó. */
+  fuente?: string;
 }
 
 export interface EvaluacionReporte {

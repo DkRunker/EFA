@@ -7,7 +7,7 @@ import random
 from pydantic import BaseModel
 
 from backend.content import (
-    m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, practicas,
+    m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, practicas, examenes_reales,
 )
 
 
@@ -19,6 +19,9 @@ class PreguntaTest(BaseModel):
     opciones: list[str]
     respuesta_correcta: int  # Índice de 0 a 3
     explicacion: str
+    # Procedencia de la pregunta. Las redactadas para la plataforma llevan
+    # "Banco propio"; las importadas indican el examen oficial de origen.
+    fuente: str = "Banco propio"
 
 
 class PreguntaPractica(BaseModel):
@@ -66,6 +69,33 @@ for _code, _mod in _MODULOS:
         )
         _qid += 1
 
+# Preguntas procedentes de exámenes oficiales EFPA y de los simuladores oficiales.
+# Se añaden al mismo banco (con su fuente) para que los simulacros puedan usarlas.
+# Aquí NO reordenamos: el orden de las opciones es el del examen original y
+# generar_examen ya baraja en cada sesión.
+for _p in examenes_reales.PREGUNTAS_EXAMEN:
+    PREGUNTAS_TEST.append(
+        PreguntaTest(
+            id=_qid,
+            modulo=_p["modulo"],
+            enunciado=_p["enunciado"],
+            opciones=list(_p["opciones"]),
+            respuesta_correcta=_p["correcta"],
+            explicacion=_p["explicacion"],
+            fuente=_p["fuente"],
+        )
+    )
+    _qid += 1
+
+# Exámenes oficiales completos, agrupados por convocatoria, para poder
+# reproducirlos tal cual en el simulador.
+EXAMENES_OFICIALES: dict[str, list[int]] = {}
+for _q in PREGUNTAS_TEST:
+    if _q.fuente.startswith("Examen oficial "):
+        EXAMENES_OFICIALES.setdefault(_q.fuente[len("Examen oficial "):], []).append(_q.id)
+# Solo consideramos convocatorias con un número razonable de preguntas.
+EXAMENES_OFICIALES = {k: v for k, v in EXAMENES_OFICIALES.items() if len(v) >= 20}
+
 # Ensamblado del banco de preguntas prácticas.
 PREGUNTAS_PRACTICAS: list[PreguntaPractica] = [
     PreguntaPractica(**p) for p in practicas.PRACTICAS
@@ -102,6 +132,62 @@ def obtener_todos_apuntes() -> dict[str, str]:
     return APUNTES_TEORICOS
 
 
+PREFIJO_OFICIAL = "Oficial: "
+
+
+def listar_examenes_oficiales() -> list[dict]:
+    """Convocatorias oficiales disponibles para reproducir en el simulador."""
+    return [
+        {
+            "id": PREFIJO_OFICIAL + nombre,
+            "nombre": nombre,
+            "n_preguntas": len(ids),
+        }
+        for nombre, ids in sorted(EXAMENES_OFICIALES.items())
+    ]
+
+
+def _preparar_para_alumno(preguntas: list[PreguntaTest]) -> tuple[list[dict], dict]:
+    """Baraja las opciones y oculta la respuesta correcta."""
+    preguntas_alumno = []
+    mapa_correctas = {}
+    for q in preguntas:
+        opciones = list(q.opciones)
+        texto_correcto = opciones[q.respuesta_correcta]
+        random.shuffle(opciones)
+        mapa_correctas[str(q.id)] = opciones.index(texto_correcto)
+        preguntas_alumno.append({
+            "id": q.id,
+            "modulo": q.modulo,
+            "tipo": q.tipo,
+            "enunciado": q.enunciado,
+            "opciones": opciones,
+        })
+    return preguntas_alumno, mapa_correctas
+
+
+def _generar_examen_oficial(nombre: str) -> dict:
+    """Reproduce una convocatoria oficial completa, en su orden original."""
+    ids = EXAMENES_OFICIALES.get(nombre)
+    if not ids:
+        raise ValueError(f"Examen oficial no encontrado: {nombre}")
+
+    por_id = {q.id: q for q in PREGUNTAS_TEST}
+    seleccionadas = [por_id[i] for i in ids]
+    preguntas_alumno, mapa_correctas = _preparar_para_alumno(seleccionadas)
+
+    return {
+        "tipo_examen": PREFIJO_OFICIAL + nombre,
+        "n_preguntas_test": len(seleccionadas),
+        "preguntas_test": preguntas_alumno,
+        "incluye_practica": False,
+        "pregunta_practica": None,
+        "ids_originales_test": [q.id for q in seleccionadas],
+        "id_practica_original": None,
+        "respuestas_correctas_test": mapa_correctas,
+    }
+
+
 def generar_examen(tipo_examen: str) -> dict:
     """
     Compone un examen simulado según la estructura del plan EFA:
@@ -111,6 +197,10 @@ def generar_examen(tipo_examen: str) -> dict:
     Respeta las ponderaciones de los 10 módulos oficiales en las preguntas tipo test.
     """
     incluye_practica = False
+
+    # Convocatoria oficial reproducida tal cual: "Oficial: EFA™ 2018 (1)".
+    if tipo_examen.startswith(PREFIJO_OFICIAL):
+        return _generar_examen_oficial(tipo_examen[len(PREFIJO_OFICIAL):])
 
     if tipo_examen == "EFA Completo":
         n_test = 50
