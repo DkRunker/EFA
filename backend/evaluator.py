@@ -22,6 +22,36 @@ class EvaluacionReporte(BaseModel):
     puntos_fallidos: list[str] = Field(..., description="Puntos de la rúbrica fallidos o no mencionados.")
 
 
+def _interpretar_numero(token: str):
+    """Devuelve los valores float plausibles de un token numérico.
+
+    Contempla las dos convenciones que conviven en el contenido:
+    - Español: punto = separador de miles, coma = decimal ("27.400,50").
+    - Anglosajón: coma = separador de miles, punto = decimal ("27,400.50").
+    Devuelve un conjunto de candidatos; basta con que uno esté dentro de la
+    tolerancia para dar el valor por acertado.
+    """
+    token = token.strip()
+    candidatos = set()
+
+    def _add(s: str):
+        try:
+            candidatos.add(float(s))
+        except ValueError:
+            pass
+
+    # Interpretación española: quitar puntos (miles), coma -> punto (decimal)
+    _add(token.replace(".", "").replace(",", "."))
+    # Interpretación anglosajona: quitar comas (miles), punto decimal
+    _add(token.replace(",", ""))
+    # Solo dígitos, por si acaso ("27400")
+    solo_digitos = re.sub(r"[^\d-]", "", token)
+    if solo_digitos not in ("", "-"):
+        _add(solo_digitos)
+
+    return candidatos
+
+
 def _evaluar_por_reglas(
     pregunta_enunciado: str,
     respuesta_alumno: str,
@@ -34,25 +64,25 @@ def _evaluar_por_reglas(
     y coincidencia de palabras clave de la rúbrica.
     """
     respuesta_normalizada = respuesta_alumno.lower()
-    
+
     # 1. Verificar valor numérico esperado
     valor_correcto = False
     comentario_valor = ""
-    
+
     if valor_esperado is not None:
-        # Encontrar todos los números en la respuesta (soporta decimales con punto y coma)
-        numeros = re.findall(r'-?\d+(?:[\.,]\d+)?', respuesta_alumno)
-        for num_str in numeros:
-            # Normalizar formato decimal
-            num_clean = num_str.replace(",", ".")
-            try:
-                val = float(num_clean)
+        # Buscamos todos los tokens numéricos (dígitos con puntos y comas). El
+        # español de España usa el punto como separador de miles y la coma como
+        # decimal ("27.400,50"), mientras que en formato anglosajón es al revés
+        # ("27,400.50"). Como en el contenido conviven ambos, para cada token
+        # probamos las dos interpretaciones y damos por bueno si ALGUNA coincide.
+        for token in re.findall(r'-?\d[\d.,]*\d|-?\d', respuesta_alumno):
+            for val in _interpretar_numero(token):
                 if abs(val - valor_esperado) <= tolerancia:
                     valor_correcto = True
                     break
-            except ValueError:
-                continue
-        
+            if valor_correcto:
+                break
+
         if valor_correcto:
             comentario_valor = f"Acierto en el valor numérico esperado ({valor_esperado})."
         else:
