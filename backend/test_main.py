@@ -2,7 +2,10 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
 
-client = TestClient(app)
+from backend.conftest import cabeceras_auth
+
+# Los endpoints exigen sesión iniciada: el cliente la lleva puesta.
+client = TestClient(app, headers=cabeceras_auth())
 
 def test_api_start_exam_efa_completo():
     response = client.post("/api/exams/start", json={"tipo_examen": "EFA Completo"})

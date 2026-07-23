@@ -2,7 +2,10 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
 
-client = TestClient(app)
+from backend.conftest import cabeceras_auth
+
+# Los endpoints exigen sesión iniciada: el cliente la lleva puesta.
+client = TestClient(app, headers=cabeceras_auth())
 
 def test_simulated_student_flow():
     print("\n--- INICIO DE SIMULACIÓN DE ESTUDIANTE SIN CONOCIMIENTOS PREVIOS ---")

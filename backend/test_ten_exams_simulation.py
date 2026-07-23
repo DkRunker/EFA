@@ -3,7 +3,10 @@ import random
 from fastapi.testclient import TestClient
 from backend.main import app
 
-client = TestClient(app)
+from backend.conftest import cabeceras_auth
+
+# Los endpoints exigen sesión iniciada: el cliente la lleva puesta.
+client = TestClient(app, headers=cabeceras_auth())
 
 def test_student_lifecycle_with_ten_exams():
     print("\n\n=== INICIANDO SIMULACIÓN DE CICLO COMPLETO CON 10 EXÁMENES ===")

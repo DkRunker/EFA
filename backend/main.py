@@ -1,7 +1,8 @@
 import os
 import uuid
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Any
@@ -15,7 +16,14 @@ from backend.database import (
     SECCIONES_TEORICAS,
 )
 from backend.evaluator import evaluar_respuesta_desarrollo
-from backend import usuarios
+from backend import usuarios, oauth as oauth_mod
+from backend.auth import (
+    clave_secreta,
+    crear_token,
+    esta_permitido,
+    origenes_permitidos,
+    usuario_actual,
+)
 from backend.formulas import (
     calcular_gordon_shapiro,
     calcular_sharpe,
@@ -36,14 +44,23 @@ from backend.formulas import (
 
 app = FastAPI(title="EFA Prep Platform API", version="1.0.0")
 
-# Permitir CORS para desarrollo local
+# CORS restringido a los orígenes declarados. Antes estaba en "*" junto con
+# allow_credentials=True: combinación que los navegadores rechazan y que, de
+# funcionar, expondría la API a cualquier página web.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origenes_permitidos(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# El flujo OAuth necesita sesión firmada para guardar el estado entre la ida al
+# proveedor y la vuelta (protege frente a CSRF en el callback).
+app.add_middleware(SessionMiddleware, secret_key=clave_secreta(), same_site="lax")
+
+oauth_mod.registrar_proveedores()
+app.include_router(oauth_mod.router)
 
 # Almacenamiento en memoria de sesiones de examen activas
 active_sessions: dict[str, dict] = {}
@@ -59,6 +76,16 @@ def api_register(user: UserAuth):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Usuario y contraseña son obligatorios."
         )
+    if len(user.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 8 caracteres."
+        )
+    if not esta_permitido(user.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta instalación es privada y tu cuenta no está autorizada."
+        )
     if not usuarios.registrar(user.username, user.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -73,7 +100,19 @@ def api_login(user: UserAuth):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos."
         )
-    return {"username": user.username, "token": f"mock-token-{uuid.uuid4().hex[:8]}"}
+    if not esta_permitido(user.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta instalación es privada y tu cuenta no está autorizada."
+        )
+    # Token de sesión real: firmado y con caducidad, verificado en cada llamada.
+    return {"username": user.username, "token": crear_token(user.username)}
+
+
+@app.get("/api/auth/yo")
+def api_sesion_actual(sesion: dict = Depends(usuario_actual)):
+    """Comprueba que la sesión sigue siendo válida y devuelve quién la usa."""
+    return {"username": sesion["sub"], "proveedor": sesion.get("proveedor", "password")}
 
 
 @app.get("/api/auth/existe/{username}")
@@ -94,13 +133,13 @@ class CalculateFormulaRequest(BaseModel):
     params: dict[str, Any]
 
 @app.get("/api/exams/oficiales")
-def api_listar_examenes_oficiales():
+def api_listar_examenes_oficiales(sesion: dict = Depends(usuario_actual)):
     """Convocatorias oficiales EFPA que pueden reproducirse íntegras."""
     return {"examenes": listar_examenes_oficiales()}
 
 
 @app.post("/api/exams/start")
-def api_start_exam(req: StartExamRequest):
+def api_start_exam(req: StartExamRequest, sesion: dict = Depends(usuario_actual)):
     try:
         examen = generar_examen(req.tipo_examen)
     except ValueError as e:
@@ -108,8 +147,11 @@ def api_start_exam(req: StartExamRequest):
         
     session_id = str(uuid.uuid4())
     
-    # Almacenamos el examen completo (con respuestas correctas) indexado por session_id
+    # Almacenamos el examen completo (con respuestas correctas) indexado por
+    # session_id, anotando de quién es para que nadie pueda entregar el examen
+    # de otro usuario conociendo su identificador.
     active_sessions[session_id] = {
+        "usuario": sesion["sub"],
         "tipo_examen": examen["tipo_examen"],
         "ids_originales_test": examen["ids_originales_test"],
         "id_practica_original": examen["id_practica_original"],
@@ -127,14 +169,20 @@ def api_start_exam(req: StartExamRequest):
     }
 
 @app.post("/api/exams/submit")
-def api_submit_exam(req: SubmitExamRequest):
+def api_submit_exam(req: SubmitExamRequest, sesion: dict = Depends(usuario_actual)):
     session = active_sessions.get(req.session_id)
     if not session:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Sesión de examen no encontrada o caducada."
         )
-        
+    if session.get("usuario") != sesion["sub"]:
+        # No revelamos que el examen existe: se responde como si no estuviera.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sesión de examen no encontrada o caducada."
+        )
+
     tipo_examen = session["tipo_examen"]
     ids_test = session["ids_originales_test"]
     id_practica = session["id_practica_original"]
@@ -221,7 +269,7 @@ def api_submit_exam(req: SubmitExamRequest):
     }
 
 @app.post("/api/formulas/calculate")
-def api_calculate_formula(req: CalculateFormulaRequest):
+def api_calculate_formula(req: CalculateFormulaRequest, sesion: dict = Depends(usuario_actual)):
     formula = req.formula
     p = req.params
     
@@ -273,11 +321,11 @@ def api_calculate_formula(req: CalculateFormulaRequest):
 
 
 @app.get("/api/study/apuntes")
-def api_get_todos_apuntes():
+def api_get_todos_apuntes(sesion: dict = Depends(usuario_actual)):
     return APUNTES_TEORICOS
 
 @app.get("/api/study/apuntes/{modulo_id}")
-def api_get_apunte_modulo(modulo_id: str):
+def api_get_apunte_modulo(modulo_id: str, sesion: dict = Depends(usuario_actual)):
     if modulo_id not in APUNTES_TEORICOS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -287,7 +335,7 @@ def api_get_apunte_modulo(modulo_id: str):
 
 
 @app.get("/api/study/secciones/{modulo_id}")
-def api_get_secciones_modulo(modulo_id: str):
+def api_get_secciones_modulo(modulo_id: str, sesion: dict = Depends(usuario_actual)):
     """Teoría estructurada por secciones (intro + secciones con cuerpo y ejercicios)."""
     if modulo_id not in SECCIONES_TEORICAS:
         raise HTTPException(

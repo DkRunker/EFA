@@ -1,5 +1,8 @@
-# Dependencias de ejecución de la Plataforma EFA (modo portable / servidor local)
 fastapi
 uvicorn
 pydantic
 python-dotenv
+pyjwt
+authlib
+itsdangerous
+httpx

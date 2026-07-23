@@ -81,3 +81,38 @@ def verificar(username: str, password: str) -> bool:
 
 def total_usuarios() -> int:
     return len(_cargar())
+
+
+# --- Identidades externas (Google, Microsoft, Facebook) ---
+#
+# Un usuario que entra con un proveedor no tiene contraseña local: se le
+# identifica por su correo verificado y se guarda de qué proveedor vino, para
+# poder distinguirlo y para no permitir que alguien "reclame" una cuenta de
+# contraseña ajena simplemente iniciando sesión con un correo homónimo.
+
+def registrar_o_actualizar_externo(email: str, proveedor: str, nombre: str = "") -> dict:
+    """Da de alta (o actualiza) al usuario que entra por un proveedor externo."""
+    email = email.strip().lower()
+    with _lock:
+        usuarios = _cargar()
+        registro = usuarios.get(email, {})
+        proveedores = set(registro.get("proveedores", []))
+        proveedores.add(proveedor)
+        registro["proveedores"] = sorted(proveedores)
+        if nombre:
+            registro["nombre"] = nombre
+        registro.setdefault("alta", _ahora())
+        usuarios[email] = registro
+        _guardar(usuarios)
+        return registro
+
+
+def tiene_contrasena(username: str) -> bool:
+    """Indica si la cuenta tiene contraseña local (frente a solo externa)."""
+    registro = _cargar().get(username, {})
+    return bool(registro.get("hash"))
+
+
+def _ahora() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")

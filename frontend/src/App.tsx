@@ -19,6 +19,18 @@ import {
 } from 'lucide-react';
 import type { ExamenSession, ExamenReport } from './types';
 import FormulaSimulator, { FORMULAS, FORMULA_KEYS } from './FormulaSimulator';
+import {
+  API_URL,
+  apiFetch,
+  guardarSesion,
+  borrarSesion,
+  usuarioGuardado,
+  recogerSesionDeLaUrl,
+  recogerErrorDeLaUrl,
+  proveedoresDisponibles,
+  urlAccesoProveedor,
+  type ProveedorAcceso,
+} from './api';
 
 function renderMarkdownToHtml(markdown: string): string {
   if (!markdown) return '';
@@ -398,9 +410,18 @@ export default function App() {
   // Autenticación
   // La sesión se conserva entre recargas: sin esto, al refrescar la página el
   // usuario volvía a la pantalla de acceso aunque ya se hubiera identificado.
-  const [currentUser, setCurrentUser] = useState<string | null>(
-    () => localStorage.getItem('efa_usuario')
-  );
+  // Si venimos de un proveedor externo, el token llega en la URL.
+  const [currentUser, setCurrentUser] = useState<string | null>(() => {
+    const dePro = recogerSesionDeLaUrl();
+    if (dePro) {
+      guardarSesion(dePro.usuario, dePro.token);
+      return dePro.usuario;
+    }
+    return usuarioGuardado();
+  });
+
+  // Proveedores de acceso disponibles en este servidor (Google, Microsoft...)
+  const [proveedores, setProveedores] = useState<ProveedorAcceso[]>([]);
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authUsername, setAuthUsername] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
@@ -462,19 +483,31 @@ export default function App() {
     }
   }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, seccionesData]);
 
-  // Carga de las convocatorias oficiales disponibles (una sola vez)
+  // Proveedores de acceso configurados en el servidor, y aviso si el proveedor
+  // externo rechazó el acceso (cuenta no autorizada, correo sin verificar...).
   useEffect(() => {
-    fetch('http://localhost:8000/api/exams/oficiales')
+    proveedoresDisponibles().then(setProveedores);
+    const error = recogerErrorDeLaUrl();
+    if (error) setErrorMsg(error);
+  }, []);
+
+  // Carga de las convocatorias oficiales. Solo con sesión iniciada: la API las
+  // protege, y pedirlas antes de entrar daría un 401 innecesario.
+  useEffect(() => {
+    if (!currentUser) return;
+    apiFetch('/api/exams/oficiales')
       .then(res => (res.ok ? res.json() : { examenes: [] }))
       .then(data => setExamenesOficiales(data.examenes || []))
       .catch(() => setExamenesOficiales([]));
-  }, []);
+  }, [currentUser]);
 
-  // Efecto para cargar la teoría estructurada por secciones
+  // Efecto para cargar la teoría estructurada por secciones. Requiere sesión:
+  // sin ella, la API responde 401 y mostraríamos un error en la propia
+  // pantalla de acceso, que confunde al usuario.
   useEffect(() => {
-    if (screen === 'STUDY' && studySubTab === 'APUNTES') {
+    if (currentUser && screen === 'STUDY' && studySubTab === 'APUNTES') {
       setErrorMsg('');
-      fetch(`http://localhost:8000/api/study/secciones/${selectedApunteModulo}`)
+      apiFetch(`/api/study/secciones/${selectedApunteModulo}`)
         .then(res => {
           if (!res.ok) throw new Error('No se pudo cargar la teoría.');
           return res.json();
@@ -486,7 +519,7 @@ export default function App() {
           setErrorMsg(err.message || 'Error de conexión');
         });
     }
-  }, [screen, studySubTab, selectedApunteModulo]);
+  }, [currentUser, screen, studySubTab, selectedApunteModulo]);
 
   // Secciones del módulo actual (para el submenú lateral) y navegación por scroll
   const seccionesApuntes = seccionesData.secciones.map((s, i) => ({ id: `sec-${i}`, title: limpiarTitulo(s.titulo) }));
@@ -522,7 +555,7 @@ export default function App() {
     
     const endpoint = authMode === 'REGISTER' ? 'register' : 'login';
     try {
-      const response = await fetch(`http://localhost:8000/api/auth/${endpoint}`, {
+      const response = await fetch(`${API_URL}/api/auth/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: authUsername, password: authPassword })
@@ -541,8 +574,8 @@ export default function App() {
         setAuthPassword('');
       } else {
         setCurrentUser(data.username);
-        localStorage.setItem('efa_usuario', data.username);
-        setScreen('DASHBOARD');
+        guardarSesion(data.username, data.token);
+        setScreen('STUDY');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error de conexión');
@@ -554,8 +587,8 @@ export default function App() {
   // Logout
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('efa_usuario');
-    setScreen('DASHBOARD');
+    borrarSesion();
+    setScreen('STUDY');
     setAuthUsername('');
     setAuthPassword('');
     setAuthSuccessMsg('');
@@ -566,7 +599,7 @@ export default function App() {
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost:8000/api/exams/start', {
+      const response = await apiFetch('/api/exams/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo_examen: tipo })
@@ -599,7 +632,7 @@ export default function App() {
     setErrorMsg('');
     
     try {
-      const response = await fetch('http://localhost:8000/api/exams/submit', {
+      const response = await apiFetch('/api/exams/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -712,8 +745,30 @@ export default function App() {
             </button>
           </form>
 
+          {/* Acceso con proveedores externos. Solo se muestran los que estén
+              configurados en el servidor, así que en local no estorban. */}
+          {proveedores.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                <span style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+                o entra con
+                <span style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+              </div>
+              {proveedores.map(p => (
+                <a
+                  key={p.id}
+                  href={urlAccesoProveedor(p.id)}
+                  className="btn btn-secondary"
+                  style={{ width: '100%', textDecoration: 'none', justifyContent: 'center' }}
+                >
+                  Continuar con {p.nombre}
+                </a>
+              ))}
+            </div>
+          )}
+
           <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-            <button 
+            <button
               style={{ background: 'none', border: 'none', color: 'var(--secondary)', cursor: 'pointer', fontSize: '0.9rem' }}
               onClick={() => {
                 setAuthMode(authMode === 'LOGIN' ? 'REGISTER' : 'LOGIN');
