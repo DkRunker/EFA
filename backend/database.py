@@ -88,11 +88,17 @@ for _p in examenes_reales.PREGUNTAS_EXAMEN:
     _qid += 1
 
 # Exámenes oficiales completos, agrupados por convocatoria, para poder
-# reproducirlos tal cual en el simulador.
+# reproducirlos tal cual en el simulador. Se reconocen tanto las convocatorias
+# reales ("Examen oficial EFA™ 2018 (1)") como los simulacros que publica EFPA
+# ("Simulacro oficial EFPA (Modelo A)"): ambos son exámenes completos.
+_PREFIJOS_EXAMEN = ("Examen oficial ", "Simulacro oficial ")
+
 EXAMENES_OFICIALES: dict[str, list[int]] = {}
 for _q in PREGUNTAS_TEST:
-    if _q.fuente.startswith("Examen oficial "):
-        EXAMENES_OFICIALES.setdefault(_q.fuente[len("Examen oficial "):], []).append(_q.id)
+    for _pref in _PREFIJOS_EXAMEN:
+        if _q.fuente.startswith(_pref):
+            EXAMENES_OFICIALES.setdefault(_q.fuente[len(_pref):], []).append(_q.id)
+            break
 # Solo consideramos convocatorias con un número razonable de preguntas.
 EXAMENES_OFICIALES = {k: v for k, v in EXAMENES_OFICIALES.items() if len(v) >= 20}
 
