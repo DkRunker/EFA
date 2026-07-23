@@ -20,5 +20,10 @@ backend/.env
 # PDF de exámenes: material con derechos, no se versiona
 *.pdf
 
+# Banco de preguntas de exámenes y simulacros: se genera a partir de los PDF y
+# no se publica. La aplicación funciona sin él (ver backend/database.py), solo
+# que con el banco propio y sin las convocatorias oficiales reproducibles.
+backend/content/examenes_reales.py
+
 # Scratch / temporales
 *.log

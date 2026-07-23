@@ -3,12 +3,23 @@ import re
 
 import pytest
 
-from backend.content.examenes_reales import PREGUNTAS_EXAMEN
 from backend.database import (
     EXAMENES_OFICIALES,
     PREGUNTAS_TEST,
     generar_examen,
     listar_examenes_oficiales,
+)
+
+# El banco importado es contenido con licencia y no se versiona: en un clon del
+# repositorio puede no estar. Estas pruebas solo aplican si está presente.
+try:
+    from backend.content.examenes_reales import PREGUNTAS_EXAMEN
+except ImportError:
+    PREGUNTAS_EXAMEN = None
+
+pytestmark = pytest.mark.skipif(
+    PREGUNTAS_EXAMEN is None,
+    reason="no está el banco importado de exámenes (contenido con licencia)",
 )
 
 MODULOS = {f"M{i}" for i in range(1, 11)}

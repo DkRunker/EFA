@@ -7,8 +7,18 @@ import random
 from pydantic import BaseModel
 
 from backend.content import (
-    m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, practicas, examenes_reales,
+    m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, practicas,
 )
+
+# Banco de preguntas importado de exámenes oficiales. Es contenido con licencia
+# y no se versiona, así que puede no estar presente en un clon del repositorio:
+# en ese caso la plataforma funciona igual, solo que con el banco propio y sin
+# las convocatorias oficiales reproducibles.
+try:
+    from backend.content import examenes_reales
+    _PREGUNTAS_IMPORTADAS = list(examenes_reales.PREGUNTAS_EXAMEN)
+except ImportError:  # pragma: no cover - depende de si el fichero está presente
+    _PREGUNTAS_IMPORTADAS = []
 
 
 class PreguntaTest(BaseModel):
@@ -73,7 +83,7 @@ for _code, _mod in _MODULOS:
 # Se añaden al mismo banco (con su fuente) para que los simulacros puedan usarlas.
 # Aquí NO reordenamos: el orden de las opciones es el del examen original y
 # generar_examen ya baraja en cada sesión.
-for _p in examenes_reales.PREGUNTAS_EXAMEN:
+for _p in _PREGUNTAS_IMPORTADAS:
     PREGUNTAS_TEST.append(
         PreguntaTest(
             id=_qid,
