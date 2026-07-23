@@ -25,5 +25,9 @@ backend/.env
 # que con el banco propio y sin las convocatorias oficiales reproducibles.
 backend/content/examenes_reales.py
 
+# Casos prácticos resueltos procedentes del libro de exámenes. Los casos de
+# elaboración propia sí se versionan (backend/content/practicas.py).
+backend/content/practicas_libro.py
+
 # Scratch / temporales
 *.log

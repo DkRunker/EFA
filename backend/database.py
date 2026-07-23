@@ -112,9 +112,18 @@ for _q in PREGUNTAS_TEST:
 # Solo consideramos convocatorias con un número razonable de preguntas.
 EXAMENES_OFICIALES = {k: v for k, v in EXAMENES_OFICIALES.items() if len(v) >= 20}
 
-# Ensamblado del banco de preguntas prácticas.
+# Casos prácticos importados del libro de exámenes: contenido con licencia que
+# tampoco se versiona, así que su presencia es opcional igual que la del banco
+# de preguntas importado.
+try:
+    from backend.content import practicas_libro
+    _PRACTICAS_IMPORTADAS = list(practicas_libro.PRACTICAS_LIBRO)
+except ImportError:  # pragma: no cover - depende de si el fichero está presente
+    _PRACTICAS_IMPORTADAS = []
+
+# Ensamblado del banco de preguntas prácticas (propias + importadas si las hay).
 PREGUNTAS_PRACTICAS: list[PreguntaPractica] = [
-    PreguntaPractica(**p) for p in practicas.PRACTICAS
+    PreguntaPractica(**p) for p in (list(practicas.PRACTICAS) + _PRACTICAS_IMPORTADAS)
 ]
 
 # Teoría estructurada por secciones (INTRO + SECCIONES) de cada módulo.

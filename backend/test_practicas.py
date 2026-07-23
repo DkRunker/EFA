@@ -1,14 +1,24 @@
 """Comprobaciones del banco de casos prácticos y del evaluador por reglas."""
 import re
 
-from backend.content.practicas import PRACTICAS
+from backend.content.practicas import PRACTICAS as PRACTICAS_PROPIAS
 from backend.evaluator import _interpretar_numero, evaluar_respuesta_desarrollo
+
+# Los casos importados del libro no se versionan: en un clon del repositorio
+# puede haber solo los propios. Comprobamos el banco tal y como lo monta la
+# aplicación, que es lo que de verdad ve el alumno.
+try:
+    from backend.content.practicas_libro import PRACTICAS_LIBRO
+except ImportError:
+    PRACTICAS_LIBRO = []
+
+PRACTICAS = list(PRACTICAS_PROPIAS) + list(PRACTICAS_LIBRO)
 
 MODULOS = {f"M{i}" for i in range(1, 11)}
 
 
 def test_estructura_de_los_casos():
-    assert len(PRACTICAS) >= 50
+    assert len(PRACTICAS) >= 35
     ids = [c["id"] for c in PRACTICAS]
     assert len(ids) == len(set(ids)), "ids duplicados"
 
