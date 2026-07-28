@@ -12,6 +12,14 @@ import tempfile
 _DIR_PRUEBAS = tempfile.mkdtemp(prefix="efa-tests-")
 os.environ["EFA_DATA_DIR"] = _DIR_PRUEBAS
 
+# Las pruebas no deben depender del backend/.env del equipo de desarrollo. Si el
+# usuario ya ha configurado su despliegue (lista de acceso, orígenes CORS...),
+# esos valores no deben filtrarse a la batería de pruebas. Fijamos aquí el
+# entorno "de fábrica"; como load_dotenv() no sobrescribe variables ya
+# presentes, esto neutraliza el .env local sin necesidad de borrarlo.
+os.environ["EFA_USUARIOS_PERMITIDOS"] = ""   # sin restricción de acceso
+os.environ["EFA_ORIGENES_CORS"] = ""         # orígenes por defecto
+
 
 def cabeceras_auth(usuario: str = "usuario_de_pruebas") -> dict[str, str]:
     """Cabecera de sesión válida para las pruebas.

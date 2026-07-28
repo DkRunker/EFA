@@ -1,5 +1,18 @@
 import os
 import uuid
+
+# Hacer que Python (y por tanto httpx, que usa Authlib para hablar con Google,
+# Microsoft o Facebook) verifique los certificados TLS contra el almacén de
+# confianza del SISTEMA OPERATIVO. Sin esto, en equipos con un antivirus o proxy
+# que intercepta el tráfico HTTPS, el intercambio OAuth falla con
+# "CERTIFICATE_VERIFY_FAILED" (error 500 al iniciar sesión con un proveedor).
+# Es seguro también en servidores Linux limpios: usa su almacén de CA habitual.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:  # pragma: no cover - si no está, se sigue con el almacén por defecto
+    pass
+
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware

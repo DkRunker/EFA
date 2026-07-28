@@ -136,6 +136,24 @@ def test_proveedor_no_configurado_avisa():
     assert r.status_code in (302, 307, 503)
 
 
+def test_redirect_uri_es_deterministica(monkeypatch):
+    """La URI de retorno OAuth se fija por EFA_URL_FRONTEND, no por el host.
+
+    Así coincide siempre con la registrada en el proveedor, sin importar si se
+    entra por localhost o por 127.0.0.1 (Google exige coincidencia exacta).
+    """
+    import backend.oauth as oauth
+
+    class _Req:
+        def url_for(self, name, proveedor):
+            from types import SimpleNamespace
+            return SimpleNamespace(path=f"/api/auth/oauth/{proveedor}/callback")
+
+    monkeypatch.setenv("EFA_URL_FRONTEND", "https://efa.ejemplo.com")
+    uri = oauth._url_callback("google", _Req())
+    assert uri == "https://efa.ejemplo.com/api/auth/oauth/google/callback"
+
+
 def test_endpoint_yo_devuelve_la_identidad(sesion_iniciada):
     r = client.get("/api/auth/yo", headers=cabecera(sesion_iniciada))
     assert r.status_code == 200

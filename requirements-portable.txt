@@ -6,3 +6,4 @@ pyjwt
 authlib
 itsdangerous
 httpx
+truststore

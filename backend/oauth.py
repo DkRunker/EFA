@@ -88,6 +88,21 @@ def _url_frontend() -> str:
     return os.environ.get("EFA_URL_FRONTEND", "http://localhost:8000").rstrip("/")
 
 
+def _url_callback(proveedor: str, request: Request) -> str:
+    """URL de retorno del proveedor.
+
+    Se construye sobre EFA_URL_FRONTEND para que sea SIEMPRE la misma y coincida
+    con la que hay que registrar en el proveedor, sin depender de si el usuario
+    entró por 'localhost' o por '127.0.0.1'. Como último recurso (si la variable
+    no está), se deduce del propio host de la petición.
+    """
+    ruta = request.url_for("callback", proveedor=proveedor).path
+    base = os.environ.get("EFA_URL_FRONTEND")
+    if base:
+        return f"{base.rstrip('/')}{ruta}"
+    return str(request.url_for("callback", proveedor=proveedor))
+
+
 def _volver_con_error(motivo: str) -> RedirectResponse:
     return RedirectResponse(f"{_url_frontend()}/?{urlencode({'error_auth': motivo})}")
 
@@ -108,7 +123,7 @@ async def iniciar(proveedor: str, request: Request):
             status.HTTP_503_SERVICE_UNAVAILABLE,
             f"El acceso con {PROVEEDORES[proveedor]['nombre']} no está configurado en este servidor.",
         )
-    redirect_uri = str(request.url_for("callback", proveedor=proveedor))
+    redirect_uri = _url_callback(proveedor, request)
     return await cliente.authorize_redirect(request, redirect_uri)
 
 
