@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from './api';
 
 // Configuración declarativa de cada fórmula del simulador.
 // Se usa tanto en la pestaña Sandbox como incrustado en la teoría ([[sim:clave]]).
@@ -205,8 +206,6 @@ export const FORMULAS: Record<string, FormulaSpec> = {
 
 export const FORMULA_KEYS = Object.keys(FORMULAS);
 
-const API = 'http://localhost:8000';
-
 interface Props {
   formula: string;
   /** Modo compacto para incrustar junto a una fórmula en la teoría. */
@@ -236,9 +235,10 @@ export default function FormulaSimulator({ formula, compact = false }: Props) {
       payload[p.key] = p.integer ? Math.round(params[p.key]) : params[p.key];
     }
     try {
-      const resp = await fetch(`${API}/api/formulas/calculate`, {
+      // apiFetch adjunta el token de sesión y la dirección base de la API;
+      // sin él, el endpoint (que ahora exige sesión) devolvería 401.
+      const resp = await apiFetch('/api/formulas/calculate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ formula, params: payload }),
       });
       const data = await resp.json();
