@@ -28,12 +28,40 @@ def _configurar_rutas():
         # sys._MEIPASS (que es temporal y se borra al cerrar). Así la sesión
         # sobrevive entre ejecuciones también en la versión portable.
         dir_exe = os.path.dirname(sys.executable)
-        os.environ.setdefault("EFA_DATA_DIR", os.path.join(dir_exe, "datos_efa"))
+        dir_datos = os.path.join(dir_exe, "datos_efa")
+        os.environ.setdefault("EFA_DATA_DIR", dir_datos)
+        # Clave de firma de las sesiones persistente. Si no se fija, cada
+        # arranque genera una distinta y las sesiones se cierran al reiniciar
+        # el .exe. La guardamos junto al ejecutable (se crea en el primer uso)
+        # para que la sesión sobreviva entre ejecuciones.
+        if not os.environ.get("EFA_SECRET_KEY"):
+            os.environ["EFA_SECRET_KEY"] = _clave_persistente(dir_datos)
     else:
         # Ejecución normal: aseguramos el directorio del proyecto en sys.path.
         raiz = os.path.dirname(os.path.abspath(__file__))
         if raiz not in sys.path:
             sys.path.insert(0, raiz)
+
+
+def _clave_persistente(dir_datos: str) -> str:
+    """Lee (o crea la primera vez) la clave de firma guardada en disco."""
+    import secrets
+    ruta = os.path.join(dir_datos, "clave_sesion.txt")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            clave = f.read().strip()
+        if clave:
+            return clave
+    except (FileNotFoundError, OSError):
+        pass
+    clave = secrets.token_urlsafe(48)
+    try:
+        os.makedirs(dir_datos, exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(clave)
+    except OSError:
+        pass  # si no se puede escribir, se usa igualmente en memoria esta sesión
+    return clave
 
 
 def _abrir_navegador():
