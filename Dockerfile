@@ -1,5 +1,5 @@
-# Imagen de la Plataforma EFA para desplegar en Hugging Face Spaces (u otro
-# hosting con Docker). Un solo contenedor sirve la API y el frontend compilado.
+# Imagen de la Plataforma EFA para desplegar en Render (u otro hosting con
+# Docker). Un solo contenedor sirve la API y el frontend compilado.
 #
 # El contenido con licencia (backend/content/examenes_reales.py y
 # practicas_libro.py) no está en el repositorio público; si está presente en el
@@ -27,7 +27,8 @@ COPY backend/ ./backend/
 # Frontend ya compilado en la etapa anterior
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 
-# Hugging Face Spaces enruta al puerto declarado (7860 por defecto).
+# El host (Render, etc.) asigna el puerto en la variable PORT; 7860 es solo el
+# valor por defecto para pruebas en local.
 ENV PORT=7860
 # En hosting gratuito el sistema de ficheros suele ser efímero o de solo
 # lectura; los datos de usuario van a un directorio escribible. Con acceso por
@@ -37,4 +38,4 @@ EXPOSE 7860
 
 # proxy-headers para que la app sepa que está tras un proxy HTTPS (el redirect
 # de OAuth y las cookies dependen de conocer el esquema real).
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-7860} --proxy-headers --forwarded-allow-ips='*'"]
