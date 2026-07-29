@@ -157,9 +157,16 @@ async def callback(proveedor: str, request: Request):
     if not esta_permitido(email):
         return _volver_con_error("Esta instalación es privada y tu cuenta no está autorizada.")
 
-    usuarios.registrar_o_actualizar_externo(
-        email=email, proveedor=proveedor, nombre=perfil.get("name", "")
-    )
+    # Anotar el alta del usuario es solo contabilidad: el acceso se decide por
+    # la lista de permitidos y la sesión es un JWT sin estado. Si el sistema de
+    # ficheros es de solo lectura (habitual en hosting gratuito), no debe
+    # impedir el acceso, así que un fallo al escribir se ignora.
+    try:
+        usuarios.registrar_o_actualizar_externo(
+            email=email, proveedor=proveedor, nombre=perfil.get("name", "")
+        )
+    except OSError:
+        pass
     jwt_propio = crear_token(email, proveedor=proveedor)
     parametros = urlencode({"token": jwt_propio, "usuario": email})
     return RedirectResponse(f"{_url_frontend()}/?{parametros}")

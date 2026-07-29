@@ -1,0 +1,32 @@
+# Lo que NO debe entrar en la imagen Docker (reduce tamaño y evita filtrar cosas)
+.git
+.gitignore
+**/__pycache__
+*.pyc
+.pytest_cache
+backend/test_*.py
+backend/conftest.py
+
+# El frontend se compila dentro de la imagen: no copiamos node_modules ni el
+# build local (se regenera limpio en la etapa 1).
+frontend/node_modules
+frontend/dist
+
+# Artefactos del portable y del empaquetado
+dist/
+build/
+*.spec
+run_portable.py
+
+# Datos locales y secretos: nunca dentro de la imagen
+data/
+datos_efa/
+backend/.env
+.env
+
+# Material con derechos que no se sirve desde la app
+*.pdf
+
+# Documentación y scratch
+*.md
+!README.md
