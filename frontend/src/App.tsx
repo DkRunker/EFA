@@ -15,7 +15,9 @@ import {
   Lock,
   BookOpen as BookIcon,
   Calculator,
-  LogOut
+  LogOut,
+  Sun,
+  Moon
 } from 'lucide-react';
 import type { ExamenSession, ExamenReport } from './types';
 import FormulaSimulator, { FORMULAS, FORMULA_KEYS } from './FormulaSimulator';
@@ -31,6 +33,16 @@ import {
   urlAccesoProveedor,
   type ProveedorAcceso,
 } from './api';
+
+// Presenta los nombres de examen sin el reclamo de "oficial", para no sugerir
+// vínculo o respaldo de EFPA. No altera los datos ni el enrutado interno: solo
+// lo que se muestra en pantalla (lista de convocatorias y cabecera de resultados).
+function nombreExamenNeutro(nombre: string): string {
+  return (nombre || '')
+    .replace(/^Oficial:\s*/i, '')
+    .replace(/Examen oficial/gi, 'Examen')
+    .replace(/Simulacro oficial/gi, 'Simulacro');
+}
 
 function renderMarkdownToHtml(markdown: string): string {
   if (!markdown) return '';
@@ -182,7 +194,7 @@ function renderMarkdownToHtml(markdown: string): string {
         filas.push(parseRow(lines[j]));
         j++;
       }
-      const th = 'border:1px solid var(--border-color);padding:8px 11px;text-align:left;color:#fff;background:rgba(255,255,255,0.05);';
+      const th = 'border:1px solid var(--border-color);padding:8px 11px;text-align:left;color:var(--text-primary);background:var(--surface-soft);';
       const td = 'border:1px solid var(--border-color);padding:8px 11px;color:var(--text-primary);vertical-align:top;';
       let tabla = '<div style="overflow-x:auto;margin:12px 0;"><table style="border-collapse:collapse;width:100%;font-size:0.95rem;">';
       tabla += '<thead><tr>' + cabecera.map((h) => `<th style="${th}">${h}</th>`).join('') + '</tr></thead><tbody>';
@@ -219,7 +231,7 @@ function renderMarkdownToHtml(markdown: string): string {
       const headerText = renderInlineMarkdown(headerMatch[2].replace(/\s+#+$/, ''));
       const headingId = `hb-${headingCounter++}`;
 
-      let style = 'margin-top: 24px; margin-bottom: 12px; font-weight: 600; color: #fff; scroll-margin-top: 24px;';
+      let style = 'margin-top: 24px; margin-bottom: 12px; font-weight: 600; color: var(--text-primary); scroll-margin-top: 24px;';
       if (level === 1) style += 'font-size: 1.8rem; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;';
       else if (level === 2) style += 'font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;';
       else if (level === 3) style += 'font-size: 1.35rem; border-left: 4px solid var(--primary); padding-left: 12px; margin-bottom: 16px;';
@@ -378,7 +390,7 @@ function EjercicioWidget({ ej, n }: { ej: Ejercicio; n: number }) {
           value={valor}
           onChange={(e) => setValor(e.target.value)}
           placeholder="Escribe tu resultado"
-          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', color: '#fff' }}
+          style={{ width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', color: 'var(--text-primary)' }}
         />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -407,6 +419,19 @@ function EjercicioWidget({ ej, n }: { ej: Ejercicio; n: number }) {
 }
 
 export default function App() {
+  // Tema claro/oscuro. Al entrar por primera vez se respeta la preferencia del
+  // sistema operativo; si el usuario elige un tema, se recuerda en localStorage.
+  const [tema, setTema] = useState<'claro' | 'oscuro'>(() => {
+    const guardado = localStorage.getItem('efa_tema');
+    if (guardado === 'claro' || guardado === 'oscuro') return guardado;
+    const prefiereOscuro = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return prefiereOscuro ? 'oscuro' : 'claro';
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', tema === 'oscuro' ? 'dark' : 'light');
+    localStorage.setItem('efa_tema', tema);
+  }, [tema]);
+
   // Autenticación
   // La sesión se conserva entre recargas: sin esto, al refrescar la página el
   // usuario volvía a la pantalla de acceso aunque ya se hubiera identificado.
@@ -690,21 +715,32 @@ export default function App() {
     return (
       <div className="container fade-in" style={{ maxWidth: '480px', marginTop: '80px' }}>
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-12px' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '6px 10px' }}
+              onClick={() => setTema(t => (t === 'oscuro' ? 'claro' : 'oscuro'))}
+              title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              aria-label="Cambiar tema"
+            >
+              {tema === 'oscuro' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: '2rem', background: 'linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block', marginBottom: '8px' }}>
               EFA Prep Platform
             </h1>
-            <p>Accede a tu simulador inteligente oficial</p>
+            <p>Tu simulador inteligente para preparar la certificación</p>
           </div>
 
           {authSuccessMsg && (
-            <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid var(--success)', padding: '12px', borderRadius: '8px', color: '#8dfcb9', fontSize: '0.9rem' }}>
+            <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid var(--success)', padding: '12px', borderRadius: '8px', color: 'var(--success)', fontSize: '0.9rem' }}>
               {authSuccessMsg}
             </div>
           )}
 
           {errorMsg && (
-            <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error)', padding: '12px', borderRadius: '8px', color: '#ff8a8a', fontSize: '0.9rem' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error)', padding: '12px', borderRadius: '8px', color: 'var(--error)', fontSize: '0.9rem' }}>
               {errorMsg}
             </div>
           )}
@@ -720,7 +756,7 @@ export default function App() {
                   value={authUsername}
                   onChange={(e) => setAuthUsername(e.target.value)}
                   placeholder="Introduce tu usuario"
-                  style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                  style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
                 />
               </div>
             </div>
@@ -735,7 +771,7 @@ export default function App() {
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
                   placeholder="Introduce tu contraseña"
-                  style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                  style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
                 />
               </div>
             </div>
@@ -798,8 +834,18 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
             <User size={16} />
-            <span style={{ fontWeight: 500, color: '#fff' }}>{currentUser}</span>
+            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{currentUser}</span>
           </div>
+
+          <button
+            className="btn btn-secondary"
+            style={{ padding: '8px 12px' }}
+            onClick={() => setTema(t => (t === 'oscuro' ? 'claro' : 'oscuro'))}
+            title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label="Cambiar tema"
+          >
+            {tema === 'oscuro' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
 
           <button className="btn btn-danger" style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', color: 'var(--error)' }} onClick={handleLogout}>
             <LogOut size={16} />
@@ -873,7 +919,7 @@ export default function App() {
 
             <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '16px', borderRadius: '12px' }}>
-                <BookOpen style={{ color: '#fff', width: '32px', height: '32px' }} />
+                <BookOpen style={{ color: 'var(--primary)', width: '32px', height: '32px' }} />
               </div>
               <div>
                 <h3 style={{ fontSize: '1.8rem' }}>{currentHistorial.length}</h3>
@@ -891,8 +937,8 @@ export default function App() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '40px' }}>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '260px' }}>
               <div>
-                <h3 style={{ marginBottom: '8px', color: '#fff', fontSize: '1.3rem' }}>EIP Nivel I</h3>
-                <p style={{ marginBottom: '20px' }}>Simulación del examen oficial de acceso nivel I. 40 preguntas tipo test.</p>
+                <h3 style={{ marginBottom: '8px', color: 'var(--text-primary)', fontSize: '1.3rem' }}>EIP Nivel I</h3>
+                <p style={{ marginBottom: '20px' }}>Simulación del examen de acceso nivel I. 40 preguntas tipo test.</p>
                 <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={16} /> 1h 30m</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><BookIcon size={16} /> 40 Preguntas</span>
@@ -905,9 +951,9 @@ export default function App() {
 
             <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '260px', border: '1px solid rgba(138, 43, 226, 0.2)' }}>
               <div>
-                <h3 style={{ marginBottom: '8px', color: '#fff', fontSize: '1.3rem', display: 'flex', justifyContent: 'space-between' }}>
+                <h3 style={{ marginBottom: '8px', color: 'var(--text-primary)', fontSize: '1.3rem', display: 'flex', justifyContent: 'space-between' }}>
                   EFA Completo
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--primary)', borderRadius: '12px', color: '#fff' }}>Oficial</span>
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--primary)', borderRadius: '12px', color: '#fff' }}>Certificación</span>
                 </h3>
                 <p style={{ marginBottom: '20px' }}>Examen de certificación directa EFA. 50 preguntas tipo test y 1 caso práctico de desarrollo fiscal/financiero.</p>
                 <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
@@ -922,7 +968,7 @@ export default function App() {
 
             <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '260px' }}>
               <div>
-                <h3 style={{ marginBottom: '8px', color: '#fff', fontSize: '1.3rem' }}>EFA Nivel II</h3>
+                <h3 style={{ marginBottom: '8px', color: 'var(--text-primary)', fontSize: '1.3rem' }}>EFA Nivel II</h3>
                 <p style={{ marginBottom: '20px' }}>Simulador del examen Nivel II. 40 preguntas tipo test y 1 caso práctico.</p>
                 <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={16} /> 2h 30m</span>
@@ -938,7 +984,7 @@ export default function App() {
           {examenesOficiales.length > 0 && (
             <>
               <h2 style={{ marginBottom: '8px', fontSize: '1.5rem', borderLeft: '4px solid var(--accent, #f59e0b)', paddingLeft: '12px' }}>
-                Convocatorias oficiales
+                Convocatorias EFPA anteriores
               </h2>
               <p style={{ marginBottom: '24px', color: 'var(--text-secondary)' }}>
                 Exámenes reales de convocatorias EFA anteriores, con sus preguntas y explicaciones originales.
@@ -947,7 +993,7 @@ export default function App() {
                 {examenesOficiales.map(ex => (
                   <div key={ex.id} className="card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                      <h3 style={{ color: '#fff', fontSize: '1.05rem', marginBottom: '4px' }}>{ex.nombre}</h3>
+                      <h3 style={{ color: 'var(--text-primary)', fontSize: '1.05rem', marginBottom: '4px' }}>{nombreExamenNeutro(ex.nombre)}</h3>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                         <BookIcon size={14} /> {ex.n_preguntas} preguntas
                       </span>
@@ -984,7 +1030,7 @@ export default function App() {
                 ) : (
                   currentHistorial.map((h, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '16px', fontWeight: 500, color: '#fff' }}>{h.tipo}</td>
+                      <td style={{ padding: '16px', fontWeight: 500, color: 'var(--text-primary)' }}>{h.tipo}</td>
                       <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{h.fecha}</td>
                       <td style={{ padding: '16px', fontWeight: 600, color: h.aprobado ? 'var(--success)' : 'var(--error)' }}>
                         {h.nota}%
@@ -1028,7 +1074,7 @@ export default function App() {
                 <select
                   value={selectedFormula}
                   onChange={(e) => setSelectedFormula(e.target.value)}
-                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', color: '#fff', fontSize: '1rem', outline: 'none' }}
+                  style={{ width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none' }}
                 >
                   {FORMULA_KEYS.map((k) => (
                     <option key={k} value={k}>{FORMULAS[k].label}</option>
@@ -1044,7 +1090,7 @@ export default function App() {
             </div>
           ) : (
             /* APUNTES TEÓRICOS */
-            <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px', alignItems: 'start' }}>
+            <div className="split-2col">
               {/* Selector de módulo con submenú de secciones */}
               <aside className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px', position: 'sticky', top: '24px', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' }}>
                 <h4 style={{ marginBottom: '12px', fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>Módulos del Temario</h4>
@@ -1064,7 +1110,7 @@ export default function App() {
                           borderRadius: '8px',
                           border: activo ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
                           background: activo ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255,255,255,0.02)',
-                          color: activo ? '#fff' : 'var(--text-secondary)',
+                          color: activo ? 'var(--text-primary)' : 'var(--text-secondary)',
                           cursor: 'pointer',
                           textAlign: 'left',
                           fontSize: '0.95rem',
@@ -1093,7 +1139,7 @@ export default function App() {
                   página hace scroll de forma natural (la barra lateral es sticky).
                   card-static evita el efecto de desplazamiento al pasar el ratón. */}
               <main className="card card-static" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
+                <div className="theory-body" style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
                   {/* Introducción del módulo */}
                   {seccionesData.intro && (
                     <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(seccionesData.intro) }} />
@@ -1101,7 +1147,7 @@ export default function App() {
                   {/* Secciones: título con id (para el submenú), cuerpo con simuladores en línea y ejercicios */}
                   {seccionesData.secciones.map((sec, i) => (
                     <section key={i} style={{ marginTop: '8px' }}>
-                      <h2 id={`sec-${i}`} style={{ marginTop: '24px', marginBottom: '12px', fontWeight: 600, color: '#fff', fontSize: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', scrollMarginTop: '24px' }}>
+                      <h2 id={`sec-${i}`} style={{ marginTop: '24px', marginBottom: '12px', fontWeight: 600, color: 'var(--text-primary)', fontSize: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', scrollMarginTop: '24px' }}>
                         {limpiarTitulo(sec.titulo)}
                       </h2>
                       <SeccionCuerpo cuerpo={sec.cuerpo} />
@@ -1129,12 +1175,12 @@ export default function App() {
 
       {/* PANTALLA: SIMULADOR */}
       {screen === 'SIMULATOR' && activeExam && (
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px' }}>
+        <div className="split-2col">
           
           <aside className="card" style={{ padding: '20px', height: 'fit-content' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', background: 'rgba(255,255,255,0.04)', padding: '10px 16px', borderRadius: '12px', width: '100%', justifyContent: 'center' }}>
               <Clock style={{ color: 'var(--secondary)' }} />
-              <span style={{ fontSize: '1.4rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#fff' }}>
+              <span style={{ fontSize: '1.4rem', fontFamily: 'monospace', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                 {formatTime(timer)}
               </span>
             </div>
@@ -1156,7 +1202,7 @@ export default function App() {
                       background: activa 
                         ? 'rgba(0, 229, 255, 0.1)' 
                         : contestada ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-                      color: activa || contestada ? '#fff' : 'var(--text-secondary)',
+                      color: activa ? 'var(--text-primary)' : contestada ? '#fff' : 'var(--text-secondary)',
                       cursor: 'pointer',
                       fontWeight: 'bold',
                       transition: 'all 0.15s ease'
@@ -1178,7 +1224,7 @@ export default function App() {
                     background: selectedQuestionIndex === activeExam.preguntas_test.length
                       ? 'rgba(0, 229, 255, 0.1)'
                       : answersPrac[activeExam.pregunta_practica.id] ? 'var(--success)' : 'rgba(255,255,255,0.03)',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     cursor: 'pointer',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
@@ -1237,7 +1283,7 @@ export default function App() {
                           readOnly
                           style={{ marginRight: '16px', accentColor: 'var(--primary)', width: '18px', height: '18px' }}
                         />
-                        <span style={{ color: '#fff', fontSize: '1.05rem' }}>{opcion}</span>
+                        <span style={{ color: 'var(--text-primary)', fontSize: '1.05rem' }}>{opcion}</span>
                       </div>
                     );
                   })}
@@ -1270,11 +1316,11 @@ export default function App() {
                       placeholder="Redacta la explicación de variables y muestra las aserciones cuantitativas obtenidas..."
                       style={{
                         width: '100%',
-                        background: 'rgba(0,0,0,0.2)',
+                        background: 'var(--input-bg)',
                         border: '1px solid var(--border-color)',
                         borderRadius: '12px',
                         padding: '16px',
-                        color: '#fff',
+                        color: 'var(--text-primary)',
                         fontFamily: 'inherit',
                         fontSize: '1.05rem',
                         lineHeight: '1.5',
@@ -1339,7 +1385,7 @@ export default function App() {
                 }}>
                   {activeReport.aprobado_general ? 'Aprobado General' : 'Suspendido General'}
                 </span>
-                <h2 style={{ fontSize: '2rem' }}>{activeReport.tipo_examen}</h2>
+                <h2 style={{ fontSize: '2rem' }}>{nombreExamenNeutro(activeReport.tipo_examen)}</h2>
               </div>
               
               <div style={{ display: 'flex', gap: '32px' }}>
@@ -1369,7 +1415,7 @@ export default function App() {
 
           {activeReport.evaluacion_practica && (
             <div className="card">
-              <h3 style={{ fontSize: '1.4rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#fff' }}>
+              <h3 style={{ fontSize: '1.4rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)' }}>
                 <Award /> Evaluación Detallada del Caso Práctico
               </h3>
               
@@ -1388,7 +1434,7 @@ export default function App() {
                 
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                   <h4 style={{ color: 'var(--secondary)', marginBottom: '8px', fontSize: '0.95rem' }}>Dictamen del Tribunal</h4>
-                  <p style={{ color: '#fff', lineHeight: '1.6', fontSize: '0.95rem' }}>
+                  <p style={{ color: 'var(--text-primary)', lineHeight: '1.6', fontSize: '0.95rem' }}>
                     {activeReport.evaluacion_practica.comentario_cualitativo}
                   </p>
                 </div>
@@ -1397,7 +1443,7 @@ export default function App() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px', color: '#fff' }}>
+            <h3 style={{ fontSize: '1.4rem', borderLeft: '4px solid var(--primary)', paddingLeft: '12px', color: 'var(--text-primary)' }}>
               Desglose de Preguntas Teóricas
             </h3>
             
@@ -1419,7 +1465,7 @@ export default function App() {
                   </span>
                 </div>
                 
-                <h4 style={{ fontSize: '1.15rem', color: '#fff', marginBottom: '16px', lineHeight: '1.5' }}>
+                <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.5' }}>
                   {item.enunciado}
                 </h4>
                 
@@ -1438,7 +1484,7 @@ export default function App() {
                     }
                     return (
                       <div key={opIdx} style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${borderCol}`, background: bgCol, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: isCorrect || isSelected ? '#fff' : 'var(--text-secondary)' }}>{op}</span>
+                        <span style={{ color: isCorrect || isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{op}</span>
                         {isCorrect && <CheckCircle size={18} style={{ color: 'var(--success)' }} />}
                         {isSelected && !item.es_correcta && <XCircle size={18} style={{ color: 'var(--error)' }} />}
                       </div>
@@ -1446,7 +1492,7 @@ export default function App() {
                   })}
                 </div>
                 
-                <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '16px' }}>
+                <div style={{ background: 'var(--surface-soft)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '16px' }}>
                   <h5 style={{ color: 'var(--secondary)', marginBottom: '6px', fontSize: '0.9rem' }}>Explicación:</h5>
                   <p style={{ color: 'var(--text-primary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
                     {item.explicacion}

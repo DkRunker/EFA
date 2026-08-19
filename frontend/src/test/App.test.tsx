@@ -7,7 +7,7 @@ test('renders auth screen by default', () => {
   
   // Verificar cabecera de autenticación
   expect(screen.getByText('EFA Prep Platform')).toBeInTheDocument();
-  expect(screen.getByText('Accede a tu simulador inteligente oficial')).toBeInTheDocument();
+  expect(screen.getByText('Tu simulador inteligente para preparar la certificación')).toBeInTheDocument();
   
   // Verificar campos
   expect(screen.getByText('Usuario')).toBeInTheDocument();

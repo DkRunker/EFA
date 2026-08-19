@@ -3,35 +3,89 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark;
-  
-  --bg-primary: #0b0f19;
-  --bg-secondary: #131a2b;
-  --bg-card: rgba(30, 41, 67, 0.45);
-  --border-color: rgba(255, 255, 255, 0.08);
-  
-  --primary: #8a2be2;
-  --primary-hover: #9b42f5;
-  --secondary: #00e5ff;
-  --secondary-hover: #33ebff;
-  
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
-  
-  --success: #10b981;
-  --error: #ef4444;
-  --warning: #f59e0b;
-  
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
-  --shadow-glow: 0 0 15px rgba(138, 43, 226, 0.4);
+  /* ===== Tema CLARO (por defecto) ===== */
+  color-scheme: light;
+
+  --bg-primary: #eef1f8;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.78);
+  --border-color: rgba(15, 23, 42, 0.12);
+
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --secondary: #0e7490;
+  --secondary-hover: #155e75;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --input-bg: #ffffff;
+  --surface-soft: rgba(15, 23, 42, 0.05);
+
+  --success: #059669;
+  --error: #dc2626;
+  --warning: #d97706;
+
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.10), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.18), 0 4px 6px -2px rgba(15, 23, 42, 0.10);
+  --shadow-glow: 0 0 15px rgba(124, 58, 237, 0.30);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Tema OSCURO ===== */
+/* Los mismos tokens con los valores oscuros. Se aplican cuando el usuario elige
+   "oscuro" explícitamente, o cuando su sistema lo prefiere y no ha elegido claro. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-primary: #0b0f19;
+  --bg-secondary: #131a2b;
+  --bg-card: rgba(30, 41, 67, 0.45);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --primary: #8a2be2;
+  --primary-hover: #9b42f5;
+  --secondary: #00e5ff;
+  --secondary-hover: #33ebff;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --input-bg: rgba(0, 0, 0, 0.28);
+  --surface-soft: rgba(255, 255, 255, 0.04);
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 15px rgba(138, 43, 226, 0.4);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg-primary: #0b0f19;
+    --bg-secondary: #131a2b;
+    --bg-card: rgba(30, 41, 67, 0.45);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --primary: #8a2be2;
+    --primary-hover: #9b42f5;
+    --secondary: #00e5ff;
+    --secondary-hover: #33ebff;
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --input-bg: rgba(0, 0, 0, 0.28);
+    --surface-soft: rgba(255, 255, 255, 0.04);
+    --success: #10b981;
+    --error: #ef4444;
+    --warning: #f59e0b;
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+    --shadow-glow: 0 0 15px rgba(138, 43, 226, 0.4);
+  }
 }
 
 * {
@@ -50,7 +104,7 @@ body {
 /* Desplegables nativos en modo oscuro: la lista de opciones necesita un fondo
    SÓLIDO (no semitransparente) para que no se pinte en gris con texto ilegible. */
 select {
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 select option,
 select optgroup {
@@ -145,11 +199,11 @@ select option:hover {
 .sim-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--text-secondary); }
 .sim-field input {
   width: 100%;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--input-bg);
   border: 1px solid var(--border-color);
   padding: 8px 10px;
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.95rem;
   outline: none;
 }
@@ -158,14 +212,14 @@ select option:hover {
 .sim-error { margin-top: 10px; color: var(--error); font-size: 0.85rem; }
 .sim-result {
   margin-top: 12px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--surface-soft);
   border-radius: 10px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.sim-result-line { display: flex; justify-content: space-between; gap: 12px; color: #fff; }
+.sim-result-line { display: flex; justify-content: space-between; gap: 12px; color: var(--text-primary); }
 .sim-result-line strong { color: var(--secondary); }
 
 /* Callouts intercalados en la teoría: ejemplos resueltos y errores comunes */
@@ -220,7 +274,7 @@ select option:hover {
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   letter-spacing: -0.025em;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 p {
@@ -256,14 +310,14 @@ p {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-soft);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--surface-soft);
+  border-color: var(--primary);
 }
 
 .btn-accent {
@@ -315,8 +369,63 @@ p {
 .math-block {
   overflow-x: auto;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--surface-soft);
   border-radius: 8px;
   margin: 12px 0;
   border-left: 3px solid var(--secondary);
+}
+
+/* ===== Layout de dos columnas (teoría y simulador): barra lateral + contenido.
+   Se define aquí (no en línea) para poder apilarlo en móvil con una media query. */
+.split-2col {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+/* Contenido de teoría: tablas y fórmulas anchas no deben romper la página;
+   se desbordan con scroll dentro de su propia caja. */
+.theory-body table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.theory-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+/* ===== Adaptación a móvil / pantallas estrechas ===== */
+@media (max-width: 768px) {
+  .container {
+    padding: 18px 12px;
+  }
+  /* Todo a una sola columna: la barra lateral pasa arriba y deja de ser fija. */
+  .split-2col {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .split-2col > aside {
+    position: static !important;
+    width: 100%;
+    height: auto !important;
+  }
+  .card {
+    padding: 18px;
+  }
+  /* Lectura más cómoda donde hay mucho texto seguido (teoría). */
+  .theory-body {
+    font-size: 1.12rem !important;
+    line-height: 1.8 !important;
+  }
+  /* Títulos grandes que en móvil se salían: se reducen. */
+  h1 {
+    font-size: 1.6rem !important;
+  }
+  h2 {
+    font-size: 1.35rem !important;
+  }
 }
