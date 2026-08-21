@@ -33,6 +33,11 @@ import {
   urlAccesoProveedor,
   type ProveedorAcceso,
 } from './api';
+// KaTeX empaquetado en la app (NO desde un CDN externo): así las fórmulas se
+// renderizan siempre, sin depender de la red ni de tiempos de carga del CDN, y
+// funciona también sin conexión (versión portable).
+import renderMathInElement from 'katex/contrib/auto-render';
+import 'katex/dist/katex.min.css';
 
 // Presenta los nombres de examen sin el reclamo de "oficial", para no sugerir
 // vínculo o respaldo de EFPA. No altera los datos ni el enrutado interno: solo
@@ -490,22 +495,21 @@ export default function App() {
     ];
   });
 
-  // Efecto KaTeX
+  // Efecto KaTeX: renderiza las fórmulas usando el KaTeX empaquetado (import),
+  // no un global del CDN. Así no hay carrera de carga ni dependencia externa.
   useEffect(() => {
-    if (typeof (window as any).renderMathInElement === 'function') {
-      const t = setTimeout(() => {
-        (window as any).renderMathInElement(document.body, {
-          delimiters: [
-            { left: '$$', right: '$$', display: true },
-            { left: '$', right: '$', display: false },
-            { left: '\\(', right: '\\)', display: false },
-            { left: '\\[', right: '\\]', display: true }
-          ],
-          throwOnError: false
-        });
-      }, 50);
-      return () => clearTimeout(t);
-    }
+    const t = setTimeout(() => {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true }
+        ],
+        throwOnError: false
+      });
+    }, 50);
+    return () => clearTimeout(t);
   }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, seccionesData]);
 
   // Proveedores de acceso configurados en el servidor, y aviso si el proveedor
