@@ -696,7 +696,9 @@ export default function App() {
       });
     }, 50);
     return () => clearTimeout(t);
-  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, seccionesData]);
+    // `tema` está incluido a propósito: al cambiar de tema, React vuelve a
+    // pintar el contenido con los $$ en crudo, así que hay que re-renderizar KaTeX.
+  }, [screen, selectedQuestionIndex, activeReport, selectedFormula, currentUser, studySubTab, selectedApunteModulo, seccionesData, tema]);
 
   // Proveedores de acceso configurados en el servidor, y aviso si el proveedor
   // externo rechazó el acceso (cuenta no autorizada, correo sin verificar...).
