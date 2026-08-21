@@ -375,6 +375,40 @@ p {
   border-left: 3px solid var(--secondary);
 }
 
+/* ===== Gráficas SVG intercaladas en la teoría ===== */
+.grafica {
+  margin: 18px auto;
+  max-width: 660px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 14px 8px;
+  overflow-x: auto;
+}
+.grafica svg {
+  display: block;
+  width: 100%;
+  max-width: 660px;
+  height: auto;
+  margin: 0 auto;
+}
+.grafica-cap {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.grafica-error {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 4px solid var(--warning);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
 /* ===== Layout de dos columnas (teoría y simulador): barra lateral + contenido.
    Se define aquí (no en línea) para poder apilarlo en móvil con una media query. */
 .split-2col {
