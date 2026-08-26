@@ -413,42 +413,66 @@ p {
    Se define aquí (no en línea) para poder apilarlo en móvil con una media query. */
 .split-2col {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  /* minmax(0, 1fr) —y no 1fr, que es minmax(auto,1fr)— para que la columna de
+     contenido PUEDA encoger por debajo del ancho de su contenido más ancho
+     (tablas, fórmulas). Si no, una tabla ancha estira toda la columna y el
+     contenido se sale de la pantalla en móvil. */
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
 
 /* Contenido de teoría: tablas y fórmulas anchas no deben romper la página;
    se desbordan con scroll dentro de su propia caja. */
+.theory-body {
+  /* palabras/URLs largas no fuerzan el ancho */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 .theory-body table {
   display: block;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
 }
 .theory-body .katex-display {
   overflow-x: auto;
   overflow-y: hidden;
+  max-width: 100%;
   padding: 4px 0;
 }
+/* Las gráficas y el texto no deben empujar el ancho de la columna. */
+.theory-body figure.grafica { max-width: 100%; }
 
 /* ===== Adaptación a móvil / pantallas estrechas ===== */
 @media (max-width: 768px) {
   .container {
     padding: 18px 12px;
+    max-width: 100%;
   }
-  /* Todo a una sola columna: la barra lateral pasa arriba y deja de ser fija. */
+  /* Todo a una sola columna que PUEDE encoger (minmax(0,1fr)); si fuera 1fr, el
+     contenido ancho (tablas, fórmulas) estiraría la columna y se saldría. */
   .split-2col {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
   .split-2col > aside {
     position: static !important;
     width: 100%;
     height: auto !important;
+    min-width: 0;
+  }
+  .split-2col > main {
+    min-width: 0;
+  }
+  /* Rejillas del panel: una sola columna en móvil (evita el minmax(320px)). */
+  .grid-dashboard {
+    grid-template-columns: 1fr;
   }
   .card {
     padding: 18px;
+    min-width: 0;
   }
   /* Lectura más cómoda donde hay mucho texto seguido (teoría). */
   .theory-body {
