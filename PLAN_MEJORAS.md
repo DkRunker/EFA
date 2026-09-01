@@ -114,3 +114,61 @@ confirmamos alcance para `[1]` y `[2]`.
 - El contenido con licencia del libro y el `LIBRO_MACRO.md` extraído **no** se
   suben al repo público (igual que los exámenes).
 - Añadir la nota de atribución CC BY a OpenStax cuando se integre el contenido.
+
+---
+
+# Cola de tareas pendientes (registrado 25/08/2026)
+
+> Estado actual: reforzando la teoría de todos los módulos a >500k caracteres con
+> tratamiento experto+pedagogo y gráficas, sección a sección (de una en una).
+> Hecho: M1, M4, M9 (ya lo estaban), **M6 (desplegado)**. En curso: **M7**.
+> Pendientes tras M7: M5, M10, M2, M3, M8.
+
+Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
+
+## T1. Recuperar del historial de git TODOS los ejercicios/tests de cada sección
+- Para cada módulo (m1-m10) y cada sección, recorrer el historial de commits y
+  reunir la UNIÓN de todos los ejercicios que hayan existido alguna vez en esa
+  sección.
+- **Añadirlos a los ya existentes; NO eliminar ninguno (solo ampliar).**
+- **Deduplicar**: si una pregunta/ejercicio está repetida, incluirla una sola vez
+  (clave de dedupe: enunciado normalizado + tipo + opciones/correcta o
+  valor_esperado). Así ningún ejercicio jamás escrito se pierde.
+- (Nota: la expansión actual con `fusion_expand.py` ya conserva los existentes,
+  pero esta pasada garantiza recuperar cualquiera perdido en cualquier punto de la
+  historia y consolidar el banco máximo por sección.)
+
+### T1-bis. Rescatar las CALCULADORAS/SIMULADORES repartidos por la teoría
+- Durante las ampliaciones se **perdieron las calculadoras** que estaban embebidas
+  en el cuerpo de la teoría (bloques tipo `[[sim:...]]`, que el renderer convierte
+  en widgets interactivos dentro del texto). En los prompts de expansión se pedía
+  explícitamente NO incluir `[[sim:]]`, así que las ampliaciones las dejaron fuera.
+- **En la MISMA pasada por el historial de git** que la T1: para cada módulo y cada
+  sección, recorrer los commits, localizar todos los bloques `[[sim:...]]` que
+  hayan existido alguna vez en el cuerpo, y **reinsertarlos en la parte
+  correspondiente de la teoría actual** (por ancla de contexto: junto al párrafo/
+  epígrafe donde estaban), sin duplicar.
+- **Antes** de reinsertar: comprobar que el renderer (`App.tsx`) sigue soportando
+  la sintaxis `[[sim:...]]` y qué simuladores existen; si el catálogo de sims
+  cambió, mapear cada uno al widget vigente. Verificar en navegador que cada
+  calculadora rescatada renderiza y calcula.
+
+## T2. Ampliar los tests/ejercicios de los EXÁMENES (simulador)
+- Ampliar el banco de preguntas/ejercicios que alimenta los exámenes y simulacros.
+- Valorar (y probablemente hacer) **añadir TODAS las preguntas y ejercicios de las
+  secciones al banco de exámenes**, para que los simulacros tengan muchísimo más
+  fondo. Revisar cómo lo consume `backend/database.py` y respetar ponderaciones por
+  módulo.
+
+## T3. Responsive móvil (BUG persistente)
+- En móvil el contenido **se sale del ancho de la pantalla** continuamente (scroll
+  horizontal de toda la página), pese a la media query añadida antes.
+- **Añadir el `@media` adecuado para un ancho móvil estándar** y forzar que NADA
+  desborde: tablas, bloques KaTeX (`.katex-display`), gráficas SVG, rejillas y
+  cualquier ancho fijo deben quedar contenidos (usar `max-width:100%`,
+  `overflow-x:auto` en sus contenedores, `word-break` donde haga falta) y el `body`
+  nunca debe tener scroll horizontal.
+- Es un fallo de usabilidad real para estudiar desde el móvil.
+
+> "Cuando acabemos todo esto seguiremos con esto" (el usuario): primero terminar la
+> teoría de los módulos, luego T1 → T2 → T3.
