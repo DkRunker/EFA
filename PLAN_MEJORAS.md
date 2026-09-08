@@ -172,3 +172,19 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 
 > "Cuando acabemos todo esto seguiremos con esto" (el usuario): primero terminar la
 > teoría de los módulos, luego T1 → T2 → T3.
+
+## Estado (02/09/2026): T1, T1-bis, T2, T3 HECHOS y desplegados
+- **T1**: recuperados del historial 226 ejercicios perdidos y anexados (dedup).
+- **T1-bis**: rescatadas 37 calculadoras `[[sim:]]` y reinsertadas en la teoría.
+- **T2**: banco de simulacros (test) 365 → 2.776 volcando los ejercicios de opción de
+  las secciones. Y banco de PRÁCTICAS 40 → 1.055 desde los ejercicios numéricos.
+- **T3**: responsive, ya estaba.
+
+## T4. Exámenes sintéticos (pedido 02/09/2026) — PENDIENTE
+- Generar exámenes completos SINTÉTICOS (test + caso práctico) de elaboración propia,
+  con dificultad **similar o superior** a los exámenes oficiales/simulacros con licencia
+  (que están en `backend/content/examenes_reales.py`, no versionado).
+- Que se integren en el simulador como exámenes completos reproducibles (mecanismo
+  `EXAMENES_OFICIALES` en `database.py`, prefijos "Examen oficial "/"Simulacro oficial ";
+  para los sintéticos usar una fuente/prefijo propio, p. ej. "Simulacro sintético ...").
+- Cuidar la calidad y el nivel: preguntas de aplicación y casos multi-paso, no triviales.
