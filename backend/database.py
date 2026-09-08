@@ -100,6 +100,32 @@ for _p in _PREGUNTAS_IMPORTADAS:
     _qid += 1
 
 
+# Exámenes sintéticos de elaboración propia (versionados, sin licencia). Son
+# simulacros completos con dificultad similar o superior a la de los oficiales;
+# se incorporan como convocatorias reproducibles con fuente "Simulacro sintético ...".
+try:
+    from backend.content import examenes_sinteticos as _examenes_sinteticos
+    _EXAMENES_SINTETICOS = list(_examenes_sinteticos.EXAMENES_SINTETICOS)
+except ImportError:  # pragma: no cover
+    _EXAMENES_SINTETICOS = []
+
+for _ex in _EXAMENES_SINTETICOS:
+    _fuente = "Simulacro sintético " + _ex["nombre"]
+    for _p in _ex["preguntas"]:
+        PREGUNTAS_TEST.append(
+            PreguntaTest(
+                id=_qid,
+                modulo=_p["modulo"],
+                enunciado=_p["enunciado"],
+                opciones=list(_p["opciones"]),
+                respuesta_correcta=_p["correcta"],
+                explicacion=_p.get("explicacion", ""),
+                fuente=_fuente,
+            )
+        )
+        _qid += 1
+
+
 # Además del banco propio (PREGUNTAS de cada módulo) y de las preguntas importadas
 # de exámenes oficiales, incorporamos al banco de simulacros los EJERCICIOS TIPO
 # TEST (opción múltiple) que hay repartidos por las SECCIONES de la teoría. Así los
@@ -146,7 +172,7 @@ for _code, _mod in _MODULOS:
 # reproducirlos tal cual en el simulador. Se reconocen tanto las convocatorias
 # reales ("Examen oficial EFA™ 2018 (1)") como los simulacros que publica EFPA
 # ("Simulacro oficial EFPA (Modelo A)"): ambos son exámenes completos.
-_PREFIJOS_EXAMEN = ("Examen oficial ", "Simulacro oficial ")
+_PREFIJOS_EXAMEN = ("Examen oficial ", "Simulacro oficial ", "Simulacro sintético ")
 
 EXAMENES_OFICIALES: dict[str, list[int]] = {}
 for _q in PREGUNTAS_TEST:
