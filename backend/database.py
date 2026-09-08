@@ -4,6 +4,7 @@
 # Este fichero ensambla ese contenido y expone la API pública histórica:
 #   PREGUNTAS_TEST, PREGUNTAS_PRACTICAS, APUNTES_TEORICOS, generar_examen, ...
 import random
+import re
 import unicodedata
 from pydantic import BaseModel
 
@@ -169,6 +170,87 @@ except ImportError:  # pragma: no cover - depende de si el fichero está present
 PREGUNTAS_PRACTICAS: list[PreguntaPractica] = [
     PreguntaPractica(**p) for p in (list(practicas.PRACTICAS) + _PRACTICAS_IMPORTADAS)
 ]
+
+# Además de las prácticas propias y las importadas, derivamos casos prácticos de
+# cálculo a partir de los EJERCICIOS NUMÉRICOS de las secciones de teoría: tienen un
+# valor esperado ya verificado y una explicación con la solución trabajada, así que
+# son práctica de cálculo de calidad. Se deduplican por enunciado normalizado. Con
+# esto el banco de prácticas pasa de decenas a más de mil casos.
+_STOP = {
+    "para", "como", "cual", "cuales", "sobre", "entre", "segun", "porque", "cuando",
+    "donde", "esta", "este", "esto", "estos", "estas", "unos", "unas", "cada", "muy",
+    "mas", "menos", "que", "con", "los", "las", "del", "una", "uno", "por", "sus",
+    "sin", "año", "anos", "euros", "euro", "siguiente", "siguientes", "valor",
+    "calcula", "calcular", "cuanto", "cuanta", "cuantos", "cuantas", "obtenga",
+    "determine", "indique", "aproximadamente", "resultado", "tiene", "tienen",
+}
+
+
+def _palabras_clave(enunciado: str, n: int = 5) -> list[str]:
+    _txt = "".join(c for c in unicodedata.normalize("NFD", enunciado or "")
+                   if unicodedata.category(c) != "Mn").lower()
+    _cand: list[str] = []
+    _vistas: set[str] = set()
+    for _w in re.findall(r"[a-z]{6,}", _txt):
+        if _w in _STOP or _w in _vistas:
+            continue
+        _vistas.add(_w)
+        _cand.append(_w)
+        if len(_cand) >= n:
+            break
+    return _cand
+
+
+def _rubrica_de(explicacion: str, valor_esperado) -> list[str]:
+    _frases = [s.strip() for s in re.split(r"(?<=[.;])\s+", (explicacion or "").strip()) if len(s.strip()) >= 15]
+    _puntos = _frases[:3]
+    _cierre = f"Llegar al resultado esperado (aprox. {valor_esperado})."
+    if not _puntos:
+        _puntos = ["Plantear el cálculo con la fórmula adecuada."]
+    if _cierre not in _puntos:
+        _puntos.append(_cierre)
+    return _puntos
+
+
+_pid = max((p.id for p in PREGUNTAS_PRACTICAS), default=0) + 1
+_practicas_vistas = {_norm_enunciado(p.enunciado) for p in PREGUNTAS_PRACTICAS}
+for _code, _mod in _MODULOS:
+    for _sec in _mod.SECCIONES:
+        for _e in _sec.get("ejercicios", []):
+            if _e.get("tipo") == "opcion":
+                continue
+            _val = _e.get("valor_esperado")
+            try:
+                _val = float(_val)
+            except (TypeError, ValueError):
+                continue
+            _enun = _e.get("enunciado", "")
+            if not isinstance(_enun, str) or len(_enun.strip()) < 15:
+                continue
+            _clave = _norm_enunciado(_enun)
+            if not _clave or _clave in _practicas_vistas:
+                continue
+            _practicas_vistas.add(_clave)
+            _tol = _e.get("tolerancia")
+            try:
+                _tol = float(_tol)
+            except (TypeError, ValueError):
+                _tol = max(abs(_val) * 0.01, 0.01)
+            _expl = _e.get("explicacion", "") or ""
+            PREGUNTAS_PRACTICAS.append(
+                PreguntaPractica(
+                    id=_pid,
+                    modulo=_code,
+                    tipo="practico",
+                    enunciado=_enun,
+                    rubrica=_rubrica_de(_expl, _val),
+                    palabras_clave=_palabras_clave(_enun),
+                    valor_esperado=_val,
+                    tolerancia=_tol,
+                    explicacion=_expl,
+                )
+            )
+            _pid += 1
 
 # Teoría estructurada por secciones (INTRO + SECCIONES) de cada módulo.
 # Cada sección: {"titulo", "cuerpo", "ejercicios": [...]}.
