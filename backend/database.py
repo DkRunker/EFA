@@ -278,6 +278,33 @@ for _code, _mod in _MODULOS:
             )
             _pid += 1
 
+# Cada examen sintético puede llevar su propio CASO PRÁCTICO (parte II), para que
+# sea un examen completo (test + práctica). Lo registramos en el banco de prácticas
+# y guardamos el enlace nombre_examen -> id de práctica.
+_PRACTICA_SINTETICA_POR_EXAMEN: dict[str, int] = {}
+_pid_sint = max((p.id for p in PREGUNTAS_PRACTICAS), default=0) + 1
+for _ex in _EXAMENES_SINTETICOS:
+    _prac = _ex.get("practica")
+    if not _prac:
+        continue
+    PREGUNTAS_PRACTICAS.append(
+        PreguntaPractica(
+            id=_pid_sint,
+            modulo=_prac["modulo"],
+            tipo="practico",
+            enunciado=_prac["enunciado"],
+            rubrica=list(_prac.get("rubrica", [])),
+            palabras_clave=list(_prac.get("palabras_clave", [])),
+            valor_esperado=_prac.get("valor_esperado"),
+            tolerancia=float(_prac.get("tolerancia", 0.01)),
+            explicacion=_prac.get("explicacion", ""),
+        )
+    )
+    # La clave es el nombre "pelado", que es como aparece en EXAMENES_OFICIALES
+    # (fuente sin el prefijo) y como lo recibe _generar_examen_oficial.
+    _PRACTICA_SINTETICA_POR_EXAMEN[_ex["nombre"]] = _pid_sint
+    _pid_sint += 1
+
 # Teoría estructurada por secciones (INTRO + SECCIONES) de cada módulo.
 # Cada sección: {"titulo", "cuerpo", "ejercicios": [...]}.
 SECCIONES_TEORICAS: dict[str, dict] = {
@@ -353,14 +380,30 @@ def _generar_examen_oficial(nombre: str) -> dict:
     seleccionadas = [por_id[i] for i in ids]
     preguntas_alumno, mapa_correctas = _preparar_para_alumno(seleccionadas)
 
+    # Los exámenes sintéticos propios pueden llevar su caso práctico (parte II),
+    # de modo que sean exámenes completos (test + práctica) como el EFA real.
+    id_practica = _PRACTICA_SINTETICA_POR_EXAMEN.get(nombre)
+    pregunta_practica = None
+    if id_practica is not None:
+        _p = next((q for q in PREGUNTAS_PRACTICAS if q.id == id_practica), None)
+        if _p is not None:
+            pregunta_practica = {
+                "id": _p.id,
+                "modulo": _p.modulo,
+                "tipo": _p.tipo,
+                "enunciado": _p.enunciado,
+            }
+        else:
+            id_practica = None
+
     return {
         "tipo_examen": PREFIJO_OFICIAL + nombre,
         "n_preguntas_test": len(seleccionadas),
         "preguntas_test": preguntas_alumno,
-        "incluye_practica": False,
-        "pregunta_practica": None,
+        "incluye_practica": pregunta_practica is not None,
+        "pregunta_practica": pregunta_practica,
         "ids_originales_test": [q.id for q in seleccionadas],
-        "id_practica_original": None,
+        "id_practica_original": id_practica,
         "respuestas_correctas_test": mapa_correctas,
     }
 
