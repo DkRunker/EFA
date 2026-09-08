@@ -4,6 +4,7 @@
 # Este fichero ensambla ese contenido y expone la API pública histórica:
 #   PREGUNTAS_TEST, PREGUNTAS_PRACTICAS, APUNTES_TEORICOS, generar_examen, ...
 import random
+import unicodedata
 from pydantic import BaseModel
 
 from backend.content import (
@@ -96,6 +97,49 @@ for _p in _PREGUNTAS_IMPORTADAS:
         )
     )
     _qid += 1
+
+
+# Además del banco propio (PREGUNTAS de cada módulo) y de las preguntas importadas
+# de exámenes oficiales, incorporamos al banco de simulacros los EJERCICIOS TIPO
+# TEST (opción múltiple) que hay repartidos por las SECCIONES de la teoría. Así los
+# simulacros disponen de muchísimo más fondo. Los ejercicios numéricos no encajan en
+# el formato test y se dejan fuera (siguen usándose en la teoría). Se deduplica por
+# enunciado normalizado frente a todo lo ya incorporado.
+def _norm_enunciado(_s: str) -> str:
+    _s = "".join(c for c in unicodedata.normalize("NFD", _s or "") if unicodedata.category(c) != "Mn")
+    return " ".join(_s.lower().split())
+
+
+_enunciados_vistos = {_norm_enunciado(_q.enunciado) for _q in PREGUNTAS_TEST}
+for _code, _mod in _MODULOS:
+    for _sec in _mod.SECCIONES:
+        for _e in _sec.get("ejercicios", []):
+            if _e.get("tipo") != "opcion":
+                continue
+            _ops = _e.get("opciones")
+            _corr = _e.get("correcta")
+            if not (isinstance(_ops, list) and len(_ops) == 4
+                    and isinstance(_corr, int) and 0 <= _corr < 4):
+                continue
+            _clave = _norm_enunciado(_e.get("enunciado", ""))
+            if not _clave or _clave in _enunciados_vistos:
+                continue
+            _enunciados_vistos.add(_clave)
+            _opts = list(_ops)
+            _texto_correcto = _opts[_corr]
+            random.Random(_qid).shuffle(_opts)
+            PREGUNTAS_TEST.append(
+                PreguntaTest(
+                    id=_qid,
+                    modulo=_code,
+                    enunciado=_e["enunciado"],
+                    opciones=_opts,
+                    respuesta_correcta=_opts.index(_texto_correcto),
+                    explicacion=_e.get("explicacion", ""),
+                    fuente="Banco propio (teoría)",
+                )
+            )
+            _qid += 1
 
 # Exámenes oficiales completos, agrupados por convocatoria, para poder
 # reproducirlos tal cual en el simulador. Se reconocen tanto las convocatorias
