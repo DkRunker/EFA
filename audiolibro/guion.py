@@ -20,6 +20,8 @@ import importlib
 import re
 import sys
 import unicodedata
+
+from num2words import num2words
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -289,7 +291,7 @@ ABREVIATURAS = [
     (r'\bSr\.', 'señor'), (r'\bi\. ?e\.', 'es decir'), (r'\betc\.', 'etcétera'),
 ]
 SIMBOLOS = [
-    ('≈', ' aproximadamente '), ('→', ', lo que lleva a, '), ('⇒', ', entonces, '), ('←', ' '),
+    ('->', ', luego '), (' + ', ' más '), ('≈', ' aproximadamente '), ('→', ', lo que lleva a, '), ('⇒', ', entonces, '), ('←', ' '),
     ('↑', ' sube '), ('↓', ' baja '), ('×', ' por '), ('≤', ' menor o igual que '),
     ('≥', ' mayor o igual que '), ('≠', ' distinto de '), ('±', ' más o menos '), ('–', ', '),
     ('—', ', '), ('…', '...'), ('•', ''), ('✅', ''), ('❌', ''), ('⚠️', ''), ('⚠', ''), ('💡', ''),
@@ -354,8 +356,71 @@ def con_formulas(t: str) -> str:
     return s.replace('…', '...').strip()
 
 
+# --- Números en palabras ----------------------------------------------------
+# VoiceStudio 0.5.6 no conoce el formato español: lee "1.000" como "uno" y "250.000" como
+# "doscientos cincuenta", y se atasca con enteros largos. Por eso aquí se escriben TODOS los
+# números en palabras y al motor no le queda nada que interpretar.
+
+_ORDINALES = {1: 'primero', 2: 'segundo', 3: 'tercero', 4: 'cuarto', 5: 'quinto', 6: 'sexto',
+              7: 'séptimo', 8: 'octavo', 9: 'noveno', 10: 'décimo'}
+_ORDINALES_F = {k: v[:-1] + 'a' for k, v in _ORDINALES.items()}
+# tras estas palabras, "uno" se queda como "uno" ("uno por ciento", "uno de enero", "uno coma cinco")
+_NO_APOCOPAR = {'por', 'más', 'menos', 'igual', 'entre', 'y', 'o', 'coma', 'de', 'del', 'a', 'al',
+                'elevado', 'sub', 'punto', 'barra', 'es', 'son', 'que', 'en', 'se', 'no', 'frente'}
+
+
+def _entero(n: int) -> str:
+    return num2words(n, lang='es')
+
+
+def _decimal(ent: str, dec: str) -> str:
+    """'3','88' -> 'tres coma ochenta y ocho'; '0','07' -> 'cero coma cero siete'."""
+    ceros = len(dec) - len(dec.lstrip('0'))
+    resto = dec.lstrip('0')
+    partes = ['cero'] * ceros + ([_entero(int(resto))] if resto else [])
+    return f'{_entero(int(ent))} coma {" ".join(partes)}'
+
+
+def _numero(m: re.Match) -> str:
+    txt = m.group(0)
+    neg = txt.startswith('-')
+    txt = txt.lstrip('-')
+    if ',' in txt:
+        ent, dec = txt.split(',', 1)
+        r = _decimal(ent.replace('.', ''), dec)
+    else:
+        r = _entero(int(txt.replace('.', '')))
+    return ('menos ' if neg else '') + r
+
+
+def numeros_hablados(s: str) -> str:
+    # ordinales: 1.º, 2.ª, 3º
+    s = re.sub(r'\b(\d{1,2})\.?º', lambda m: _ORDINALES.get(int(m.group(1)), m.group(1) + 'º'), s)
+    s = re.sub(r'\b(\d{1,2})\.?ª', lambda m: _ORDINALES_F.get(int(m.group(1)), m.group(1) + 'ª'), s)
+    # rangos y barras entre cifras: "2-3 años" -> "2 a 3 años"; "35/2006" -> "35 barra 2006"
+    s = re.sub(r'(?<=\d)\s*[-–]\s*(?=\d)', ' a ', s)
+    s = re.sub(r'(?<=\d)/(?=\d)', ' barra ', s)
+    # numeración de apartados "3.1" o "3.1.2" (grupos de 1 o 2 cifras): "3 punto 1"
+    s = re.sub(r'\b\d{1,2}(?:\.\d{1,2})+\b(?!,\d)', lambda m: ' punto '.join(m.group(0).split('.')), s)
+    # signo menos pegado a una cifra en prosa
+    s = re.sub(r'(?<![\w)])-(?=\d)', '-', s)
+    s = re.sub(r'(?<![\w.,])-?\d{1,3}(?:\.\d{3})+(?:,\d+)?(?![\d])|(?<![\w.,])-?\d+(?:,\d+)?(?![\d])',
+               _numero, s)
+    # apócope: "uno euros" -> "un euros"... "veintiuno años" -> "veintiún años"
+    def apocope(m: re.Match) -> str:
+        palabra, sig = m.group(1), m.group(2)
+        if sig.lower() in _NO_APOCOPAR:
+            return m.group(0)
+        base = palabra[:-3] + ('ún' if palabra.endswith('iuno') else 'un')
+        return f'{base} {sig}'
+    s = re.sub(r'\b(\w*uno) ([A-Za-zÁÉÍÓÚáéíóúñÑ]+)', apocope, s)
+    s = re.sub(r'\bun euros\b', 'un euro', s)
+    s = re.sub(r'\b(millón|millones) (euros|dólares|€)', r'\1 de \2', s)
+    return s
+
+
 def _frase(s: str) -> str:
-    s = s.strip()
+    s = numeros_hablados(s.strip())
     if s and s[-1] not in '.:;?!':
         s += '.'
     return s
@@ -572,7 +637,7 @@ def guion_modulo(clave: str) -> list[Path]:
     for num, titulo, cuerpo in piezas:
         cab = (f'Módulo {n}: {mod.NOMBRE}. Introducción.' if num == '00'
                else f'Módulo {n}. Capítulo {int(num)}: {prosa(titulo)}.')
-        parrafos = [cab] + markdown_hablado(cuerpo)
+        parrafos = [numeros_hablados(p) for p in [cab] + markdown_hablado(cuerpo)]
         f = carpeta / f'{num}-{slug(titulo)}.txt'
         f.write_text('\n\n'.join(parrafos) + '\n', encoding='utf-8')
         ficheros.append(f)
