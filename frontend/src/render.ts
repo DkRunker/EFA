@@ -84,7 +84,8 @@ function _numEje(v: number): string {
 }
 
 function _grafLineasBarras(tipo: string, p: Record<string, string>, series: { nombre: string; valores: number[] }[]): string {
-  const xs = (p['x'] || '').split(',').map(s => s.trim()).filter(Boolean);
+  // algunas gráficas del temario nombran el eje x como "categorias" o "etiquetas"
+  const xs = (p['x'] || p['categorias'] || p['etiquetas'] || '').split(',').map(s => s.trim()).filter(Boolean);
   const n = Math.max(xs.length, ...series.map(s => s.valores.length), 1);
   const todos = series.flatMap(s => s.valores);
   const esc = _escalaRedonda(Math.min(0, ...todos), Math.max(...todos, 0));

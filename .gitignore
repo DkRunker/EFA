@@ -34,3 +34,6 @@ backend/content/practicas_libro.py
 
 # Libro PDF/EPUB generado (se regenera con: cd frontend && npm run libro -- m1)
 libro_generado/
+
+# Audiolibro generado: guiones, caché de audio y MP3 (python audiolibro/guion.py y sintetizar.py)
+audiolibro_generado/
