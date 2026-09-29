@@ -33,7 +33,9 @@ function _parseGrafica(spec: string): { p: Record<string, string>; series: { nom
   return { p, series };
 }
 
-const GRAF_W = 660, GRAF_H = 380, GRAF_L = 58, GRAF_R = 22, GRAF_T = 40, GRAF_B = 52;
+// GRAF_T deja sitio para el título (y=22) y, debajo, la fila de la leyenda (y≈32),
+// de modo que leyenda y título nunca se solapan.
+const GRAF_W = 660, GRAF_H = 380, GRAF_L = 58, GRAF_R = 22, GRAF_T = 52, GRAF_B = 52;
 const GRAF_PW = GRAF_W - GRAF_L - GRAF_R, GRAF_PH = GRAF_H - GRAF_T - GRAF_B;
 
 function _grafMarco(titulo: string, ejex: string, ejey: string): string {
@@ -51,7 +53,7 @@ function _grafLeyenda(nombres: string[]): string {
   if (nombres.filter(n => n).length < 2) return '';
   let s = '';
   let x = GRAF_L + 4;
-  const y = GRAF_T - 22;
+  const y = GRAF_T - 20;
   nombres.forEach((n, i) => {
     if (!n) return;
     s += `<rect x="${x}" y="${y}" width="14" height="10" rx="2" fill="${GRAF_COLORES[i % GRAF_COLORES.length]}"/>`;
@@ -66,20 +68,35 @@ function _svgWrap(inner: string, caption: string): string {
   return `<figure class="grafica"><svg viewBox="0 0 ${GRAF_W} ${GRAF_H}" role="img" xmlns="http://www.w3.org/2000/svg">${inner}</svg>${cap}</figure>`;
 }
 
+// Escala "redonda" para el eje Y: marcas en múltiplos de 1, 2, 2,5 o 5 × 10^k,
+// en vez de dividir el rango en partes iguales (que daba marcas como 98,01 o 130,68).
+function _escalaRedonda(min: number, max: number, marcas = 4): { lo: number; hi: number; paso: number } {
+  if (min === max) max = min + 1;
+  const bruto = (max - min) / marcas;
+  const mag = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const norm = bruto / mag;
+  const paso = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  return { lo: Math.floor(min / paso) * paso, hi: Math.ceil(max / paso) * paso, paso };
+}
+
+function _numEje(v: number): string {
+  return Number(v.toFixed(6)).toLocaleString('es-ES', { maximumFractionDigits: 2 });
+}
+
 function _grafLineasBarras(tipo: string, p: Record<string, string>, series: { nombre: string; valores: number[] }[]): string {
   const xs = (p['x'] || '').split(',').map(s => s.trim()).filter(Boolean);
   const n = Math.max(xs.length, ...series.map(s => s.valores.length), 1);
   const todos = series.flatMap(s => s.valores);
-  let ymin = Math.min(0, ...todos), ymax = Math.max(...todos, 0);
-  if (ymin === ymax) ymax = ymin + 1;
-  const pad = (ymax - ymin) * 0.08; ymax += pad; if (ymin < 0) ymin -= pad;
+  const esc = _escalaRedonda(Math.min(0, ...todos), Math.max(...todos, 0));
+  const ymin = esc.lo, ymax = esc.hi;
   const sy = (v: number) => GRAF_T + GRAF_PH - ((v - ymin) / (ymax - ymin)) * GRAF_PH;
   let g = _grafMarco(p['titulo'] || '', p['ejex'] || '', p['ejey'] || '');
-  // rejilla y + etiquetas y
-  for (let k = 0; k <= 4; k++) {
-    const v = ymin + (k / 4) * (ymax - ymin), y = sy(v);
+  // rejilla y + etiquetas y (en marcas redondas)
+  const nMarcas = Math.round((ymax - ymin) / esc.paso);
+  for (let k = 0; k <= nMarcas; k++) {
+    const v = ymin + k * esc.paso, y = sy(v);
     g += `<line x1="${GRAF_L}" y1="${y.toFixed(1)}" x2="${GRAF_L + GRAF_PW}" y2="${y.toFixed(1)}" stroke="var(--border-color)" stroke-width="1"/>`;
-    g += `<text x="${GRAF_L - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-muted)">${(Math.round(v * 100) / 100)}</text>`;
+    g += `<text x="${GRAF_L - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-muted)">${_numEje(v)}</text>`;
   }
   if (tipo === 'barras') {
     const grupo = GRAF_PW / n;

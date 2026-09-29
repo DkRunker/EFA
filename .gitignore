@@ -31,3 +31,6 @@ backend/content/practicas_libro.py
 
 # Scratch / temporales
 *.log
+
+# Libro PDF/EPUB generado (se regenera con: cd frontend && npm run libro -- m1)
+libro_generado/
