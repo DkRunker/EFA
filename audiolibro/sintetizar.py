@@ -174,7 +174,9 @@ def main() -> None:
     opciones = {'voz': a.voz, 'instruct': a.instruct, 'seed': a.seed, 'pasos': a.pasos,
                 'velocidad': a.velocidad}
 
-    if a.probar:
+    if a.probar is not None:
+        if not a.probar.strip():
+            sys.exit('--probar necesita un texto')
         pcm, _ = audio_de(a.probar, opciones)
         destino = Path(a.salida or (BASE / 'pruebas' / 'prueba.mp3'))
         a_mp3(pcm, destino, {'title': 'Prueba'})
