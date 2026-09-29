@@ -188,3 +188,27 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
   `EXAMENES_OFICIALES` en `database.py`, prefijos "Examen oficial "/"Simulacro oficial ";
   para los sintéticos usar una fuente/prefijo propio, p. ej. "Simulacro sintético ...").
 - Cuidar la calidad y el nivel: preguntas de aplicación y casos multi-paso, no triviales.
+- **HECHO (08/09)**: 3 modelos (A/B/C), 50 test + 1 caso práctico cada uno. Desplegado.
+
+## T5. Libro real de estudio (pedido 29/09/2026) — EN CURSO
+- Libro de la teoría en **PDF** (imprimir/pantalla) y **EPUB** (e-reader/móvil), **un volumen por
+  módulo** (todo junto serían ~1.900 páginas). Piloto con un módulo primero para validar el diseño.
+- Reutilizar el renderizado de la web (extraer `renderMarkdownToHtml`/`renderGrafica` de `App.tsx` a
+  `frontend/src/render.ts`) para que se vea igual: fórmulas KaTeX, gráficas SVG, tablas, recuadros.
+- Tooltips `[[término::def]]` → glosario del capítulo; calculadoras `[[sim:]]` → se omiten (son
+  interactivas). Ejercicios de cada sección + soluciones al final.
+- Contenido: SOLO teoría propia + OpenStax (CC BY, con atribución). NUNCA los exámenes con licencia.
+- Los PDF/EPUB generados NO se versionan (salida en carpeta ignorada); sí el generador.
+
+## T6. Audiolibro (pedido 29/09/2026) — PENDIENTE (tras el libro)
+- Herramienta: **VoiceStudio** (github.com/debpalash/VoiceStudio), usada **en LOCAL como herramienta
+  externa** vía su API local. **AGPL-3.0**: NO integrar su código en la web (obligaría a liberar la app
+  bajo AGPL); el audio generado no hereda la licencia. Los modelos de voz tienen licencias propias
+  (ok para estudio personal; revisar si hubiera uso comercial).
+- Hardware del usuario: RTX 4060 Laptop 8 GB VRAM, 32 GB RAM, i7-13700H → viable (CUDA).
+- Volumen: ~5,7 M caracteres de teoría ≈ **75-80 h de audio**; generación ~1-2 días en lote.
+- Clave: una pasada de **"guion de audio"** por sección (fórmulas dichas en palabras, gráficas
+  descritas, tablas narradas, recuadros anunciados). Un MP3 por sección con capítulos/metadatos.
+- Piloto primero: 1 sección con 2-3 voces/motores en español para validar calidad.
+- Consumo: **ambos** — MP3 en local ya, y reproductor en la web más adelante (requiere alojar
+  2-5 GB fuera de Render).
