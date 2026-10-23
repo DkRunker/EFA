@@ -190,7 +190,7 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 - Cuidar la calidad y el nivel: preguntas de aplicación y casos multi-paso, no triviales.
 - **HECHO (08/09)**: 3 modelos (A/B/C), 50 test + 1 caso práctico cada uno. Desplegado.
 
-## T5. Libro real de estudio (pedido 29/09/2026) — EN CURSO
+## T5. Libro real de estudio (pedido 29/09/2026) — HECHO (10 volúmenes PDF+EPUB, `npm run libro -- todos`)
 - Libro de la teoría en **PDF** (imprimir/pantalla) y **EPUB** (e-reader/móvil), **un volumen por
   módulo** (todo junto serían ~1.900 páginas). Piloto con un módulo primero para validar el diseño.
 - Reutilizar el renderizado de la web (extraer `renderMarkdownToHtml`/`renderGrafica` de `App.tsx` a
@@ -200,7 +200,7 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 - Contenido: SOLO teoría propia + OpenStax (CC BY, con atribución). NUNCA los exámenes con licencia.
 - Los PDF/EPUB generados NO se versionan (salida en carpeta ignorada); sí el generador.
 
-## T6. Audiolibro (pedido 29/09/2026) — PENDIENTE (tras el libro)
+## T6. Audiolibro (pedido 29/09/2026) — EN CURSO (generación por bloques)
 - Herramienta: **VoiceStudio** (github.com/debpalash/VoiceStudio), usada **en LOCAL como herramienta
   externa** vía su API local. **AGPL-3.0**: NO integrar su código en la web (obligaría a liberar la app
   bajo AGPL); el audio generado no hereda la licencia. Los modelos de voz tienen licencias propias
@@ -212,3 +212,18 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 - Piloto primero: 1 sección con 2-3 voces/motores en español para validar calidad.
 - Consumo: **ambos** — MP3 en local ya, y reproductor en la web más adelante (requiere alojar
   2-5 GB fuera de Render).
+- **Estado (23/10/2026)**: M1, M2 y M3 terminados (.m4b con capítulos); M4 casi; M5-M10 pendientes.
+  Herramientas: `audiolibro/guion.py` → `audiolibro/sintetizar.py` (bloques, `--estado`) →
+  `audiolibro/juntar.py`. Atajo: `Generar_audiolibro.bat`. Voz: perfil "Narradora EFA" (`b5d5a099`).
+  El usuario NO quiere tiradas largas: siempre bloques de ~2 h.
+
+## T7. Audio en la web (acordado 23/10/2026) — PENDIENTE: hacerlo AL TERMINAR TODAS LAS PISTAS
+- Botón **"▶ Escuchar esta lección (NN min)"** al comienzo de cada lección, con reproductor integrado:
+  velocidad (1× / 1,25× / 1,5×) y **recordar por dónde vas** en cada lección. Sin audio → sin botón.
+- Los audios NO van en Render ni en el repo de la app (~3 GB: despliegues lentos, límite de GitHub).
+  Alojamiento elegido: **GitHub Releases** de un repo público aparte (p. ej. `DkRunker/EFA-audio`),
+  un MP3 por sección; la web solo enlaza. Requiere que el usuario instale `gh` y haga `gh auth login`.
+  Alternativa descartada por ahora: dataset público de Hugging Face.
+- Los audios quedan **públicos** (quien tenga el enlace): solo teoría propia + OpenStax, nunca
+  contenido con licencia. Manifiesto `mN/NN → URL + duración` generado desde `audiolibro_generado/mp3`.
+- Opcional: bajar a 48 kb/s u Opus ~32 kb/s si se quiere reducir tamaño.
