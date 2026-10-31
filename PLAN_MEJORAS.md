@@ -227,3 +227,6 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 - Los audios quedan **públicos** (quien tenga el enlace): solo teoría propia + OpenStax, nunca
   contenido con licencia. Manifiesto `mN/NN → URL + duración` generado desde `audiolibro_generado/mp3`.
 - Opcional: bajar a 48 kb/s u Opus ~32 kb/s si se quiere reducir tamaño.
+- **Licencia de la voz**: VoiceStudio 0.5.7 declara el modelo OmniVoice como **CC-BY-NC** (más
+  términos de Higgs Audio 2 y Meta Llama 3). Vale para uso personal y la web gratuita, pero si
+  algún día se monetiza la web o se vende el audiolibro habría que regenerar con otro motor.

@@ -84,6 +84,10 @@ def pedir(texto: str, opciones: dict, reintentos: int = 3) -> bytes:
             with urllib.request.urlopen(req, timeout=600) as r:
                 return r.read()
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            # un 4xx (licencia sin aceptar, parámetro inválido…) no se arregla reintentando
+            if isinstance(e, urllib.error.HTTPError) and 400 <= e.code < 500 and e.code != 429:
+                raise RuntimeError(f'VoiceStudio rechazó la petición ({e.code}): '
+                                   f'{e.read().decode("utf-8", "replace")[:300]}') from None
             detalle = e.read().decode('utf-8', 'replace')[:300] if isinstance(e, urllib.error.HTTPError) else e
             print(f'      ! error ({detalle}); reintento {intento + 1}/{reintentos}', flush=True)
             time.sleep(5 * (intento + 1))
