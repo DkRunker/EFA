@@ -217,7 +217,9 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
   `audiolibro/juntar.py`. Atajo: `Generar_audiolibro.bat`. Voz: perfil "Narradora EFA" (`b5d5a099`).
   El usuario NO quiere tiradas largas: siempre bloques de ~2 h.
 
-## T7. Audio en la web (acordado 23/10/2026) — PENDIENTE: hacerlo AL TERMINAR TODAS LAS PISTAS
+## T7. Audio en la web (acordado 23/10/2026) — HECHO (07/11/2026)
+- Publicado: 147 MP3 en la release `v1` de `DkRunker/EFA-audio`. Si cambia el audio: regenerar la
+  sección, `python audiolibro/publicar.py` y `gh release upload v1 <fichero> --clobber`.
 - Botón **"▶ Escuchar esta lección (NN min)"** al comienzo de cada lección, con reproductor integrado:
   velocidad (1× / 1,25× / 1,5×) y **recordar por dónde vas** en cada lección. Sin audio → sin botón.
 - Los audios NO van en Render ni en el repo de la app (~3 GB: despliegues lentos, límite de GitHub).

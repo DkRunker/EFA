@@ -20,6 +20,7 @@ import {
   Moon
 } from 'lucide-react';
 import type { ExamenSession, ExamenReport } from './types';
+import { AudioLeccion } from './AudioLeccion';
 import FormulaSimulator, { FORMULAS, FORMULA_KEYS } from './FormulaSimulator';
 import {
   API_URL,
@@ -871,7 +872,10 @@ export default function App() {
                 <div className="theory-body" style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '1.05rem' }}>
                   {/* Introducción del módulo */}
                   {seccionesData.intro && (
-                    <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(seccionesData.intro) }} />
+                    <>
+                      <AudioLeccion key={selectedApunteModulo} modulo={selectedApunteModulo} pista={0} />
+                      <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(seccionesData.intro) }} />
+                    </>
                   )}
                   {/* Secciones: título con id (para el submenú), cuerpo con simuladores en línea y ejercicios */}
                   {seccionesData.secciones.map((sec, i) => (
@@ -879,6 +883,7 @@ export default function App() {
                       <h2 id={`sec-${i}`} style={{ marginTop: '24px', marginBottom: '12px', fontWeight: 600, color: 'var(--text-primary)', fontSize: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', scrollMarginTop: '24px' }}>
                         {limpiarTitulo(sec.titulo)}
                       </h2>
+                      <AudioLeccion key={selectedApunteModulo} modulo={selectedApunteModulo} pista={i + 1} />
                       <SeccionCuerpo cuerpo={sec.cuerpo} />
                       {sec.ejercicios && sec.ejercicios.length > 0 && (
                         <div style={{ marginTop: '16px' }}>
