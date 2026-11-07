@@ -200,7 +200,7 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 - Contenido: SOLO teoría propia + OpenStax (CC BY, con atribución). NUNCA los exámenes con licencia.
 - Los PDF/EPUB generados NO se versionan (salida en carpeta ignorada); sí el generador.
 
-## T6. Audiolibro (pedido 29/09/2026) — EN CURSO (generación por bloques)
+## T6. Audiolibro (pedido 29/09/2026) — HECHO (07/11/2026)
 - Herramienta: **VoiceStudio** (github.com/debpalash/VoiceStudio), usada **en LOCAL como herramienta
   externa** vía su API local. **AGPL-3.0**: NO integrar su código en la web (obligaría a liberar la app
   bajo AGPL); el audio generado no hereda la licencia. Los modelos de voz tienen licencias propias
@@ -212,7 +212,7 @@ Cuando termine la teoría de TODOS los módulos, hacer, en este orden:
 - Piloto primero: 1 sección con 2-3 voces/motores en español para validar calidad.
 - Consumo: **ambos** — MP3 en local ya, y reproductor en la web más adelante (requiere alojar
   2-5 GB fuera de Render).
-- **Estado (23/10/2026)**: M1, M2 y M3 terminados (.m4b con capítulos); M4 casi; M5-M10 pendientes.
+- **Estado (07/11/2026)**: los 10 módulos terminados: 10 `.m4b` con capítulos, 147 secciones, 98,2 h.
   Herramientas: `audiolibro/guion.py` → `audiolibro/sintetizar.py` (bloques, `--estado`) →
   `audiolibro/juntar.py`. Atajo: `Generar_audiolibro.bat`. Voz: perfil "Narradora EFA" (`b5d5a099`).
   El usuario NO quiere tiradas largas: siempre bloques de ~2 h.
